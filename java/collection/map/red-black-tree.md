@@ -126,11 +126,11 @@ Node rotateRight(Node h){
 
 前两条规则如下图所示:
 
-![part-I](../images/red-black-tree/part-1.png)
+![part-I](../images/red-black-tree/part-1.PNG)
 
 最后一条规则如下所示:
 
-![part-II](../images/red-black-tree/part-2.png)
+![part-II](../images/red-black-tree/part-2.PNG)
 
 对于第一条规则我认为没有必须要求左子链接为黑色，因为不可能产生三条连续的红链接，因为都是在树底插入，在插入之前就不可能产生两条连续的红色链接，所以插入后最多产生两条连续的红链接。下面是插入节点的代码：
 
