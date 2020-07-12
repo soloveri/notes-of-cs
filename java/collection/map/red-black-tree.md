@@ -132,7 +132,11 @@ Node rotateRight(Node h){
 
 <div align=center><img src="../images/red-black-tree/part-II.png"/></div>
 
-对于第一条规则我认为没有必须要求左子链接为黑色，因为不可能产生三条连续的红链接，因为都是在树底插入，在插入之前就不可能产生两条连续的红色链接，所以插入后最多产生两条连续的红链接。下面是插入节点的代码：
+对于第一条规则我认为没有必须要求左子链接为黑色，因为不可能产生三条连续的红链接，因为都是在树底插入，在插入之前就不可能产生两条连续的红色链接，所以插入后最多产生两条连续的红链接。
+
+### 红黑树的插入操作
+
+红黑树插入新节点时插入的是红节点,至于保持平衡那需要在插入之后修正。下面是红黑树的插入节点的代码,与普通的BST差别不是很大,最后需要在回溯修正节点的颜色时遵循上面规则：
 
 ``` java "红黑树插入代码"
 private Node put(Node x,Key key,Value val){
@@ -165,13 +169,171 @@ private Node put(Node x,Key key,Value val){
 
 ```
 
+### 红黑树的删除操作
+
+红黑树的删除比插入还复杂些,因为红黑树是完美黑节点平衡的,所以在删除时我们就不能删除黑节点,只能删除红节点。但是如果我们想要删除的值就是黑的,怎么办？办法就是把它变红。简单来说就是不断变换颜色。直到我们的目标删除节点为红色时。
+
+待删除的节点分两种：一种是在底部，没有子节点，像这样的节点，把它转换成红色的删除就好。另外一种就是有后继节点，为了保持树的有序性，我们采取跟BST的一样的操作，把待删除节点的后继节点找到，然后将待删除节点替换为后继节点。
+
+总的来说：
+
+- 我们只能删除红节点
+- 并且待删除节点不能是个2-节点，因为直接将2-节点删除会破坏平衡性
+
+所以在我们向下寻找待删除节点的时候，我们就必须保证当前处理的节点不是2-节点。
+
+**删除最小值:**
+
+这里以删除最小值为例,与BST的删除操作类似，采用递归删除。我们在每一轮递归调用时，都需要将当前节点的左子节点调整为非2-节点。如果处理节点为2-节点,这就需要:
+
+- 从左子节点的父节点(当前节点)借一个
+
+![borrow-from-father](../images/red-black-tree/borrow-from-parent.png)
+
+- 或者左子节点的兄弟节点借一个
+
+![borrow-from-bro](../images/red-black-tree/borrow-from-bro-min.png)
+
+步骤如下：我们首先从父节点借一个，这里所谓的借一个是将父节点的颜色变黑，两个子节点的颜色变红，也就是改造为4节点，然后我们再看左子节点的兄弟是否为非2-节点。如果是，那么就从兄弟借，把从父节点借的再还回去。然后我们进入下一轮递归调用，这样继续处理左子节点。保证了路径上的每个节点都不是2-节点,**把红链接一层一层传递下去**。最后删除最底层的红节点,然后再层层回溯修复节点颜色。
+
+``` java "删除最小值"
+//删除操作的大小修正都在balance中了
+    public void deleteMin(){
+        if(root==null){
+            return;
+        }
+        //为啥要进行这步操作，仅仅是为了假装根节点为3-节点吗？？？
+        //做这步操作可能是因为flipColor的写法
+        //因为flipColor的操作是把当前节点和两个子节点的颜色取反，如果不把根节点的颜色设红，后面的子节点没法借
+        if(!isRed(root.left)&&!isRed(root.right)){
+            root.color=RED;
+        }
+
+        root=deleteMin(root);
+        if(root!=null){
+            root.color=BLACK;
+        }
+    }
+    //能够进入这个函数的当前节点一定不是2节点
+    private Node deleteMin(Node h){
+        if(h.left==null){
+            return null;
+        }
+        //判断当前节点的左子节点是否为3节点
+        if(!isRed(h.left) && !isRed(h.left.left)){
+            //左子节点为黑，且它的子节点为黑，表示左子节点是一个2-节点，需要借
+            //moveRedLeft就是调整红链接一直往左边走
+            h=moveRedLeft(h);
+        }
+        h.left=deleteMin(h.left);
+        //因为前面借节点的时候，有可能只是从父节点借了一个，
+        // 这样就会导致存在right-leaning的红链接，需要修正
+        return balance(h);
+    }
+```
+
+**删除最大值:**
+
+删除最大值类似，唯一一点不同的是，我们需要把当前节点的左子节点的红链接先翻转到右边,道理很简单。删除最小值不用这么做是因为红黑树的红链接本身就在左侧。删除最大值就是要把红链接一层一层的向底层传递直到不能传递。并且如果不把红链接翻转到右侧，右树底下的节点如果为2-节点时，他没有办法向上借了。
+
+``` java "删除最大值"
+public void deleteMax(){
+        if(root==null){
+            return;
+        }
+        if(!isRed(root.left)&& !isRed(root.right)){
+            root.color=RED;
+        }
+        root=deleteMax(root);
+        if(root!=null){
+            root.color=BLACK;
+        }
+    }
+    private Node deleteMax(Node h){
+        //如果左链接是红色，那么就需要翻转到右边，不然右子节点下面的节点没法向它们的父节点借了
+        if(isRed(h.left)){
+            h=rotateRight(h);
+        }
+
+        if(h.right==null){
+            return null;
+        }
+        if(!isRed(h.right) && !isRed(h.right.left)){
+            h=moveRedRight(h);
+        }
+        h.right=deleteMax(h.right);
+        return balance(h);
+    }
+
+```
+
+**删除任意值:**
+
+删除任意值就是删除最小值与最大值的组合操作。如果想要删除的值比当前节点的值小，那么就向左继续寻找，与删除最小值类似，如果不小于当前节点的值，那么就往右走，类似于删除最大值。
+
+``` java
+public void delete(Key key){
+        if(root==null){
+            return;
+        }
+        if(!isRed(root.left) && !isRed(root.right)){
+            root.color=RED;
+        }
+        root=delete(root,key);
+        if(root!=null) {
+            root.color = BLACK;
+        }
+    }
+
+    private Node delete(Node h,Key key){
+        int cmp=key.compareTo(h.key);
+        if(cmp<0){
+            if(!isRed(h.left) && !isRed(h.left.left)){
+                h=moveRedLeft(h);
+            }
+            h.left=delete(h.left,key);
+        }
+        else{
+            //把红链接转到右边,因为原来的红链接都是左斜的，如果最大键在3-节点中，删除会导致树的不平衡,就是把红链接往右边传递
+            if(isRed(h.left)){
+                h=rotateRight(h);
+            }
+            //目标节点在底部
+            //这里只看右子节点是因为如果右子节点不为空，就说明我们找当前节点的后继节点来替换，
+            //如果为空，又因为当前节点必不是2-节点，所以可以放心删除
+            if(h.key.compareTo(key)==0 && h.right==null){
+                return null;
+            }
+            //走到这里有两种情况，要么我们需要找后继节点替换，要么目标节点在当前节点的右边
+            //总之都需要向右边的子节点走，所以必须提前右子节点为非2-节点
+            //保证要删除的值所在节点必须不能是2-节点,
+            if(!isRed(h.right) && !isRed(h.right.left)){
+                h=moveRedRight(h);
+            }
+            //如果删除的节点不是在底部，那么就拿后继节点替换
+            if(key.compareTo(h.key)==0){
+                h.val=get(root,min(h.right).key);
+                h.key=min(h.right).key;
+                h.right=deleteMin(h.right);
+            }else{
+                //否则继续向右边走
+                h.right=delete(h.right,key);
+            }
+        }
+        //balance中会调整节点大小
+        return balance(h);
+    }
+```
+
 ## 参考文献
 
 普林斯顿原始论文与代码:
+
 (https://www.cs.princeton.edu/~rs/talks/LLRB/RedBlack.pdf)
 (https://algs4.cs.princeton.edu/33balanced/RedBlackBST.java.html)
 
 他人博客笔记:
+
 (https://deserts.io/red-black-tree-deletion/)
 (https://www.jianshu.com/p/41f092a42ec1)
 (https://www.jianshu.com/p/48331a5a11f4)
