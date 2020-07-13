@@ -330,12 +330,15 @@ public void delete(Key key){
 普林斯顿原始论文与代码:
 
 (https://www.cs.princeton.edu/~rs/talks/LLRB/RedBlack.pdf)
+
 (https://algs4.cs.princeton.edu/33balanced/RedBlackBST.java.html)
 
 他人博客笔记:
 
 (https://deserts.io/red-black-tree-deletion/)
+
 (https://www.jianshu.com/p/41f092a42ec1)
+
 (https://www.jianshu.com/p/48331a5a11f4)
 
 
