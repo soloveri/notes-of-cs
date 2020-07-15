@@ -2,7 +2,7 @@
 
 分析源码初体验，第一次分析个比较简单的集合类ArrayList。我把重点放在了ArrayList实现的接口、继承的类以及几个主要的类方法上。
 
-### ArrayList继承图
+### 0x0 ArrayList继承图
 
 我们首先来看看ArrayList中的继承图。
 
@@ -23,7 +23,7 @@
 
 ok，这两个问题解决了，我们继续向下探索。
 
-### ArrayList实现的接口
+### 0x1 ArrayList实现的接口
 
 ArrayList实现了`RandomAccess`、`List`、`Cloneable`、`Serializable`接口。
 
@@ -43,7 +43,11 @@ ArrayList实现了`RandomAccess`、`List`、`Cloneable`、`Serializable`接口�
 
 作用也相当于一个marker interface，标识实现类是可序列化与反序列化的。
 
-### ArrayList中的重要字段与方法
+### 0x2 ArrayList中的重要属性与方法
+
+#### ArrayList的属性
+
+ArrayList的属性不是很多，但是有一个非常重要的属性`modCount`，继承自抽象类`AbstractList`，这个属性保证了fast-fail机制,这会在后面讲解方法的时候提到。
 
 ``` java
 
@@ -78,7 +82,7 @@ ArrayList实现了`RandomAccess`、`List`、`Cloneable`、`Serializable`接口�
      * will be expanded to DEFAULT_CAPACITY when the first element is added.
      */
 
-    //这个数组是实际存储元素的数组，不是不知道为什么不是private的啊，按道理来说即使是private也不影响内部类访问啊。
+    //这个数组是实际存储元素的数组，不知道为什么不是private的啊，按道理来说即使是private也不影响内部类访问啊。
     //注意这个数组是不参与序列化的
     transient Object[] elementData; // non-private to simplify nested class access
 
@@ -91,4 +95,71 @@ ArrayList实现了`RandomAccess`、`List`、`Cloneable`、`Serializable`接口�
     private int size;
 ```
 
-其实ArrayList还有一个非常重要的属性`modCount`，继承自抽象类`AbstractList`，这个属性保证了在多线程环境下及时终止错误。
+#### ArrayList中的方法
+
+**构造方法:**
+ArrayList中的构造方法有三个:
+
+- 默认无参构造方法
+- 初始化容量的构造方法
+- 使用集合初始化的构造方法
+
+第一个构造方法没什么好说的,就是使用`DEFAULTCAPACITY_EMPTY_ELEMENTDATA`初始化一个空的Object数组。数组的默认长度为10.
+
+``` java
+public ArrayList() {
+        this.elementData = DEFAULTCAPACITY_EMPTY_ELEMENTDATA;
+    }
+```
+
+第二个构造方法提供了一个容量参数,参数必须>=0,否则会抛出非法参数异常。如果容量大小为0,那么则使用`EMPTY_ELEMENTDATA`初始化数组,容量为0。
+
+``` java
+public ArrayList(int initialCapacity) {
+        if (initialCapacity > 0) {
+            this.elementData = new Object[initialCapacity];
+        } else if (initialCapacity == 0) {
+            this.elementData = EMPTY_ELEMENTDATA;
+        } else {
+            throw new IllegalArgumentException("Illegal Capacity: "+
+                                               initialCapacity);
+        }
+    }
+```
+
+最后一个构造方法使用一个Collection初始化ArrayList,
+
+``` java
+public ArrayList(Collection<? extends E> c) {
+        elementData = c.toArray();
+        if ((size = elementData.length) != 0) {
+            // c.toArray might (incorrectly) not return Object[] (see 6260652)
+            if (elementData.getClass() != Object[].class)
+                //如果c.toArray返回的不是Object数组,那么则需要使用数组工具类的copy方法一个一个复制元素
+                elementData = Arrays.copyOf(elementData, size, Object[].class);
+        } else {
+            // replace with empty array.
+            this.elementData = EMPTY_ELEMENTDATA;
+        }
+    }
+```
+
+这里需要提一嘴Arrays中的`copyOf`方法,其中的一个小问题困扰了我很长时间,下面是Arrays中其中一个的`copyOf`的源码:
+
+``` java
+public static <T,U> T[] copyOf(U[] original, int newLength, Class<? extends T[]> newType) {
+
+    @SuppressWarnings("unchecked")
+    T[] copy = ((Object)newType == (Object)Object[].class) ?
+            (T[]) new Object[newLength] :
+            (T[]) Array.newInstance(newType.getComponentType(), newLength);
+    System.out.println((Object)newType.toString());
+    System.arraycopy(original, 0, copy, 0,
+                        Math.min(original.length, newLength));
+    return copy;
+}
+```
+
+我一直不理解为什么需要加上`((Object)newType == (Object)Object[].class)`这一句判断，在stackoverflow上看到了一个[答案](https://stackoverflow.com/questions/29494800/do-not-understand-the-source-code-of-arrays-copyof),回答说这句话的目的就是检查`newType`是否持有一个`Object[]`类型的引用,可是这里的newType只有非基本类型的Class对象传进来才能编译成功,否则就会出现无法推断泛型的准确类型???
+
+我好像又懂了,虽然代码里写的是强转Object,但是在运行时`==`比较的是等号两边指的是否为同一个对象,并不是说,我们在代码里把它转成Object了,两边比较的就是Object.
