@@ -92,6 +92,8 @@ ArrayList的属性不是很多，但是有一个非常重要的属性`modCount`�
      * @serial
      */
      //List的大小是参与序列化的哦
+
+     //存储的是数组实际的元素个数,并不是数组的长度
     private int size;
 ```
 
@@ -162,4 +164,95 @@ public static <T,U> T[] copyOf(U[] original, int newLength, Class<? extends T[]>
 
 我一直不理解为什么需要加上`((Object)newType == (Object)Object[].class)`这一句判断，在stackoverflow上看到了一个[答案](https://stackoverflow.com/questions/29494800/do-not-understand-the-source-code-of-arrays-copyof),回答说这句话的目的就是检查`newType`是否持有一个`Object[]`类型的引用,可是这里的newType只有非基本类型的Class对象传进来才能编译成功,否则就会出现无法推断泛型的准确类型???
 
-我好像又懂了,虽然代码里写的是强转Object,但是在运行时`==`比较的是等号两边指的是否为同一个对象,并不是说,我们在代码里把它转成Object了,两边比较的就是Object.
+我好像又懂了,虽然代码里写的是强转Object,但是在运行时`==`比较的是等号两边指的是否为同一个对象,并不是说,我们在代码里把它转成Object了,在运行时两边比较的就是Object。
+
+所以`((Object)newType == (Object)Object[].class)`之所以要进行强转,是因为由于泛型的原型，两边本身就不是同一个type,所以使用`==`比较编译根本就无法通过(所以说`==`的两侧必须是同一个类型编译才能通过?)。
+
+ok,第二个困惑我的原因就很搞笑了,我原来调试的时候这句代码的执行结果一直是true,尽管我传进来的是`Integer[].class`,这我就纳了闷了,我就寻思那这句代码不是废话?既然只能传对象的Class,那不是恒成立,后来再调试的偶然瞬间发现,在调试copyOf的时候,调用这个api的函数根本就不是我写的,怪不得一直Object,不管传进来的是什么...这个错误着实搞笑,后来我直接从用户代码step into,嗯，结果对了，上述这句代码的结果为false,舒服了。
+
+最后说说为什么要有这句代码,是因为直接new比采用newInstance快,因为newInstance使用了反射,[参考：](https://stackoverflow.com/questions/29494800/do-not-understand-the-source-code-of-arrays-copyof)
+
+> new Object[...] creates an array the normal way, of a type that is statically known. Remember, the code has just checked that T[] is Object[].
+
+> Array.newInstance(...) uses reflection to dynamically create an array of the Class type passed in.
+
+
+**add方法**
+
+ArrayList的add方法挺多的，我将按照我的使用频率依次讲解。
+
+首先是`add (E e)`方法:
+
+``` java "add(E e)"
+public boolean add(E e) {
+        modCount++;
+        add(e, elementData, size);
+        return true;
+    }
+```
+
+该方法首先将modCount加1,因为add方法使ArrayList发生了结构性改变,这会在后面说到,方法内部又调用了add的重载函数,
+
+``` java
+private void add(E e, Object[] elementData, int s) {
+    if (s == elementData.length)
+        elementData = grow();
+    elementData[s] = e;
+    size = s + 1;
+}
+```
+
+首先判断ArrayList的属性`size`是否达到了`elementData`的长度,这说明`size`属性并不是实时更新,size是数组实际存储的元素个数，应该会在elemeData扩张的时候更新。如果已经没有空间存放新元素了,就调用`grow`函数。其又会调用grow的带参重载函数。
+
+``` java
+
+//此时size==elementData.length
+private Object[] grow() {
+    return grow(size + 1);
+}
+
+//minCapacity是我们能够允许的最小的新的数组空间,也就是多一个
+private Object[] grow(int minCapacity) {
+    int oldCapacity = elementData.length;
+    //如果数组中已经存在元素或者并不是调用默认构造函数创建对象
+    //那么我们可能会扩充至原始的1.5倍,为什么用可能,需要看具体的获取大小的函数
+    if (oldCapacity > 0 || elementData != DEFAULTCAPACITY_EMPTY_ELEMENTDATA) {
+        int newCapacity = ArraysSupport.newLength(oldCapacity,
+                minCapacity - oldCapacity, /* minimum growth */
+                oldCapacity >> 1           /* preferred growth */);
+        return elementData = Arrays.copyOf(elementData, newCapacity);
+    } else {
+        //否则如果我们原始大小为0,那么就扩充为10个长度
+        return elementData = new Object[Math.max(DEFAULT_CAPACITY, minCapacity)];
+    }
+}
+```
+
+获取数组新容量的函数如下:
+
+``` java
+public static int newLength(int oldLength, int minGrowth, int prefGrowth) {
+        // assert oldLength >= 0
+        // assert minGrowth > 0
+
+        int newLength = Math.max(minGrowth, prefGrowth) + oldLength;
+        //如果计算出的新大小没有超过MAX_ARRAY_LENGTH=Integer.MAX_VALUE-8
+        //那么就返回新计算出的大小
+        //否则就继续扩充,最大扩容至Integer.MAX_VALUE
+        if (newLength - MAX_ARRAY_LENGTH <= 0) {
+            return newLength;
+        }
+        return hugeLength(oldLength, minGrowth);
+    }
+
+    private static int hugeLength(int oldLength, int minGrowth) {
+        int minLength = oldLength + minGrowth;
+        if (minLength < 0) { // overflow
+            throw new OutOfMemoryError("Required array length too large");
+        }
+        if (minLength <= MAX_ARRAY_LENGTH) {
+            return MAX_ARRAY_LENGTH;
+        }
+        return Integer.MAX_VALUE;
+    }
+```
