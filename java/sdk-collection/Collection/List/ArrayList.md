@@ -2,7 +2,7 @@
 
 分析源码初体验，第一次分析个比较简单的集合类ArrayList。我把重点放在了ArrayList实现的接口、继承的类以及几个主要的类方法上。
 
-### 0x0 ArrayList继承图
+## 0x0 ArrayList继承图
 
 我们首先来看看ArrayList中的继承图。
 
@@ -23,7 +23,7 @@
 
 ok，这两个问题解决了，我们继续向下探索。
 
-### 0x1 ArrayList实现的接口
+## 0x1 ArrayList实现的接口
 
 ArrayList实现了`RandomAccess`、`List`、`Cloneable`、`Serializable`接口。
 
@@ -43,9 +43,9 @@ ArrayList实现了`RandomAccess`、`List`、`Cloneable`、`Serializable`接口�
 
 作用也相当于一个marker interface，标识实现类是可序列化与反序列化的。
 
-### 0x2 ArrayList中的重要属性与方法
+## 0x2 ArrayList中的重要属性与方法
 
-#### ArrayList的属性
+### 0x2-1 ArrayList的属性
 
 ArrayList的属性不是很多，但是有一个非常重要的属性`modCount`，继承自抽象类`AbstractList`，这个属性保证了fast-fail机制,这会在后面讲解方法的时候提到。
 
@@ -97,9 +97,9 @@ ArrayList的属性不是很多，但是有一个非常重要的属性`modCount`�
     private int size;
 ```
 
-#### ArrayList中的方法
+### 0x2-2 ArrayList中的重要方法
 
-**构造方法:**
+#### 构造方法
 ArrayList中的构造方法有三个:
 
 - 默认无参构造方法
@@ -176,8 +176,10 @@ ok,第二个困惑我的原因就很搞笑了,我原来调试的时候这句代�
 
 > Array.newInstance(...) uses reflection to dynamically create an array of the Class type passed in.
 
+`copyOf`方法是会构建一个新的数组来存放元素的拷贝,当然需要说明:**copyOf是浅拷贝!!!**
 
-**add方法**
+
+#### add方法
 
 ArrayList的add方法挺多的，我将按照我的使用频率依次讲解。
 
@@ -256,3 +258,160 @@ public static int newLength(int oldLength, int minGrowth, int prefGrowth) {
         return Integer.MAX_VALUE;
     }
 ```
+
+上面的ArrayList源码是JDK14的,和JDK8还是有点区别的,不过差别不大,都是将容量扩充到原来的1.5倍，而size只是简单的记录数组中元素的数量。
+
+#### toArray方法
+
+还有一个我经常使用的方法`toArray`,这下顺便看到了真面目,如果使用无参的`toArray`,那么因为调用的是copyOf,返回了原始数组的浅拷贝副本,也是Object数组。
+
+如果使用的是带参的`toArray`,那么参数就是我们想要该函数返回的数组类型,比如`toArray(new Integer[0])`,这里的数组长度无所谓了,反正都会创建一个数组,还有这个传入数组的类型,应该必须是非基本类型,不然又会出现类型无法推导的错误。
+
+``` java
+public Object[] toArray() {
+        return Arrays.copyOf(elementData, size);
+    }
+
+public <T> T[] toArray(T[] a) {
+        if (a.length < size)
+            // Make a new array of a's runtime type, but my contents:
+            return (T[]) Arrays.copyOf(elementData, size, a.getClass());
+        System.arraycopy(elementData, 0, a, 0, size);
+        if (a.length > size)
+            a[size] = null;
+        return a;
+    }
+
+```
+
+## 0x3 ArrayList中的迭代器
+
+为什么要讲迭代器呢?因为我想讲讲不能在使用迭代器遍历list时删除元素的原因。`AbstractList`中有一个叫做`modCount`的属性,在初次构建list对象时初始化为0。
+
+> protected transient int modCount = 0;
+
+在我们对list做出结构性改变时,modCount也会改变。所谓的结构性改变是指list中元素个数发生了变化。
+
+``` java "JDK8"
+    //add函数
+    public boolean add(E e) {
+        //每次增加元素时都需要确保仍然有空间保存元素
+        ensureCapacityInternal(size + 1);  // Increments modCount!!
+        elementData[size++] = e;
+        return true;
+    }
+    private void ensureCapacityInternal(int minCapacity) {
+        ensureExplicitCapacity(calculateCapacity(elementData, minCapacity));
+    }
+
+    private void ensureExplicitCapacity(int minCapacity) {
+        //添加元素时modCount加1
+        modCount++;
+        // overflow-conscious code
+        if (minCapacity - elementData.length > 0)
+            grow(minCapacity);
+    }
+
+    //remove函数
+    public E remove(int index) {
+        rangeCheck(index);
+        //list元素减少时,modCount加1
+        modCount++;
+        E oldValue = elementData(index);
+
+        int numMoved = size - index - 1;
+        if (numMoved > 0)
+            System.arraycopy(elementData, index+1, elementData, index,
+                             numMoved);
+        elementData[--size] = null; // clear to let GC do its work
+
+        return oldValue;
+    }
+```
+
+可以看到只要对list做增删操作,那么就会使modCount发生改变。ok,那我们接下来看看ArrayList内部类实现的迭代器。
+
+``` java "ArrayList内部实现的迭代器"
+private class Itr implements Iterator<E> {
+    int cursor;       // index of next element to return
+    int lastRet = -1; // index of last element returned; -1 if no such
+    //使用modCount初始化expectedModCount
+    int expectedModCount = modCount;
+
+    Itr() {}
+
+    public boolean hasNext() {
+        return cursor != size;
+    }
+
+    @SuppressWarnings("unchecked")
+    public E next() {
+        checkForComodification();
+        int i = cursor;
+        if (i >= size)
+            throw new NoSuchElementException();
+        Object[] elementData = ArrayList.this.elementData;
+        if (i >= elementData.length)
+            throw new ConcurrentModificationException();
+        cursor = i + 1;
+        return (E) elementData[lastRet = i];
+    }
+
+    //检查expectedModCount的值是否发生改变
+    final void checkForComodification() {
+        if (modCount != expectedModCount)
+            throw new ConcurrentModificationException();
+    }
+...
+
+}
+```
+
+可以看到,在使用迭代器的`next()`时,代码会首先检查modCount是否发生改变,那么在什么情况下modCount会发生改变?就是我们在自己额外调用例如`add()`、`remove()`改变list元素个数的方法时会改变modCount,所以如果在使用迭代器遍历的时候如果改变list的元素个数时,会抛出ConcurrentModificationException。
+
+如果在多线程环境下,其他线程有可能在当前线程遍历的同时对list做出结构性改变,所以ArrayList不是线程安全的。也会抛出同样的异常。
+
+在使用迭代器遍历时,注意如果我们仅仅是改变元素的内容,而不改变元素个数的操作是允许的。ok,问题提出来了,那么如何再使用迭代器遍历的时候增删元素?
+
+当然是调用迭代器的自己的`remove`方法了奥。
+
+``` java
+//这个单向迭代器只能删除当前获取的元素
+public void remove() {
+    if (lastRet < 0)
+        throw new IllegalStateException();
+    checkForComodification();
+
+    try {
+        //在检查完modCount之后,再调用remove方法
+        ArrayList.this.remove(lastRet);
+        cursor = lastRet;
+        lastRet = -1;
+        expectedModCount = modCount;
+    } catch (IndexOutOfBoundsException ex) {
+        throw new ConcurrentModificationException();
+    }
+}
+```
+
+下面是一个使用的小栗子👀
+
+``` java
+public void testRemove(){
+    ArrayList<Integer> t=new ArrayList<>();
+    t.add(1);
+    t.add(2);
+    t.add(3);
+    Iterator<Integer> it=t.iterator();
+    while(it.hasNext()){
+        if(it.next()==2){
+            //
+            it.remove();
+        }
+    }
+}
+```
+
+## 0x4 小结
+
+关于ArrayList的源码就分析到这里了,后续如果有什么没想到的应该会补充的奥。👼
