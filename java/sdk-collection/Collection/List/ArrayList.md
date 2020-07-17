@@ -263,7 +263,19 @@ public static int newLength(int oldLength, int minGrowth, int prefGrowth) {
 
 #### toArray方法
 
-还有一个我经常使用的方法`toArray`,这下顺便看到了真面目,如果使用无参的`toArray`,那么因为调用的是copyOf,返回了原始数组的浅拷贝副本,也是Object数组。
+还有一个我经常使用的方法`toArray`,这下顺便看到了真面目,如果使用无参的`toArray`,那么因为调用的是copyOf,返回了原始数组的浅拷贝副本,~~也是Object数组~~。该方法不一定会返回Object[]。
+因为子类对象是可以使用父类引用保持的。具体类型取决于list中的数据类型。如下 代码所示:
+
+``` java
+public Object[] toArray() {
+    return Arrays.copyOf(elementData, size);
+}
+
+public static <T> T[] copyOf(T[] original, int newLength) {
+    //这里的original就是elementData
+    return (T[]) copyOf(original, newLength, original.getClass());
+}
+```
 
 如果使用的是带参的`toArray`,那么参数就是我们想要该函数返回的数组类型,比如`toArray(new Integer[0])`,这里的数组长度无所谓了,反正都会创建一个数组,还有这个传入数组的类型,应该必须是非基本类型,不然又会出现类型无法推导的错误。
 
