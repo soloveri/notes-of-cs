@@ -1,3 +1,15 @@
+---
+title: ArrayList源码分析
+mathjax: true
+data: 2020-07-20 20:55:07
+updated:
+tags:
+- ArrayList
+categories:
+- 源码分析
+---
+
+
 ## 前言
 
 分析源码初体验，第一次分析个比较简单的集合类ArrayList。我把重点放在了ArrayList实现的接口、继承的类以及几个主要的类方法上。
@@ -29,7 +41,7 @@ ArrayList实现了`RandomAccess`、`List`、`Cloneable`、`Serializable`接口�
 
 **RandomAccess接口:**
 
-这个`RandomAccess`是一个marker interface(该接口内什么都没有实现，仅仅是作为一个标记接口)。简单来说，实现了该接口的类就一定拥有随机访问的能力。所以我们在遍历一个类的时候，建议我们首先使用`instanceOf`判断当前类是否为`RandomAccess`的实现类，如果时，那么采用for循环(p普通for循环，而不是增强型for循环，因为增强型内部也是使用迭代器)遍历比采用迭代器的平均性能更好。
+这个`RandomAccess`是一个marker interface(该接口内什么都没有实现，仅仅是作为一个标记接口)。简单来说，实现了该接口的类就一定拥有随机访问的能力。所以我们在遍历一个类的时候，建议我们首先使用`instanceOf`判断当前类是否为`RandomAccess`的实现类，如果时，那么采用for循环(普通for循环，而不是增强型for循环，因为增强型内部也是使用迭代器)遍历比采用迭代器的平均性能更好。
 
 **List接口:**
 
@@ -379,7 +391,7 @@ private class Itr implements Iterator<E> {
 }
 ```
 
-可以看到,在使用迭代器的`next()`时,代码会首先检查modCount是否发生改变,那么在什么情况下modCount会发生改变?就是我们在自己额外调用例如`add()`、`remove()`改变list元素个数的方法时会改变modCount,所以如果在使用迭代器遍历的时候如果改变list的元素个数时,会抛出ConcurrentModificationException。
+可以看到,在使用迭代器的`next()`时,代码会首先检查modCount是否发生改变,那么在什么情况下modCount会发生改变?就是我们在自己额外调用例如`add()`、`remove()`改变list元素个数的方法时会改变modCount,所以如果在使用迭代器遍历的时候如果改变list的元素个数时,会抛出ConcurrentModificationException。**这就是所谓的fail-fast**。
 
 如果在多线程环境下,其他线程有可能在当前线程遍历的同时对list做出结构性改变,所以ArrayList不是线程安全的。也会抛出同样的异常。
 
