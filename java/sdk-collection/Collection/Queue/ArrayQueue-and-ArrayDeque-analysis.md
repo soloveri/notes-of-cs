@@ -2,19 +2,7 @@
 title: ArrayQueue与ArrayDeque源码分析
 mathjax: true
 data: 2020-07-20 21:36:34
-updated:
-tags:
-- ArrayQueue
-- ArrayDeque
-- Queue
-categories:
-- 源码分析
----
----
-title: ArrayQueue与ArrayDeque源码分析
-mathjax: true
-data: 2020-07-20 21:36:34
-updated:
+updated: 2020-07-22 23:17:56
 tags:
 - ArrayQueue
 - ArrayDeque
@@ -116,72 +104,40 @@ public T get(int i) {
 
 ## 主菜-ArrayDeque源码分析
 
-双向队列`ArraDeque`底层也是数组实现的,当然与`ArrayQueue`一样,采用循环数组。
+双向队列`ArraDeque`底层也是数组实现的,当然与`ArrayQueue`一样,采用循环数组。下面是`ArrayDeque`的字段与构造方法。
 
 ``` java
 public class ArrayDeque<E> extends AbstractCollection<E>
                            implements Deque<E>, Cloneable, Serializable
 {
-    /**
-     * The array in which the elements of the deque are stored.
-     * The capacity of the deque is the length of this array, which is
-     * always a power of two. The array is never allowed to become
-     * full, except transiently within an addX method where it is
-     * resized (see doubleCapacity) immediately upon becoming full,
-     * thus avoiding head and tail wrapping around to equal each
-     * other.  We also guarantee that all array cells not holding
-     * deque elements are always null.
-     */
-     //底层采用object类型数组保存元素,
+
+     //底层采用object类型数组保存元素,双向队列的容量就是该数组的长度,并且总是2的倍数
+     //数组永远都不会填满,并且没有用于储存队列元素的数组元素都必定为null
     transient Object[] elements; // non-private to simplify nested class access
 
-    /**
-     * The index of the element at the head of the deque (which is the
-     * element that would be removed by remove() or pop()); or an
-     * arbitrary number equal to tail if the deque is empty.
-     */
+    //双端队列的头指针,只有队列中没有存储元素时head才会与tail相遇
     transient int head;
 
-    /**
-     * The index at which the next element would be added to the tail
-     * of the deque (via addLast(E), add(E), or push(E)).
-     */
+    //双端队列的尾指针,指向下一个元素的存储位置
     transient int tail;
 
-    /**
-     * The minimum capacity that we'll use for a newly created deque.
-     * Must be a power of 2.
-     */
+    //默认最小容量为8
     private static final int MIN_INITIAL_CAPACITY = 8;
 
-/**
-     * Constructs an empty array deque with an initial capacity
-     * sufficient to hold 16 elements.
-     */
+    //无参构造方法
+    //队列为空,那么就将队列扩充为16
     public ArrayDeque() {
         elements = new Object[16];
     }
 
-    /**
-     * Constructs an empty array deque with an initial capacity
-     * sufficient to hold the specified number of elements.
-     *
-     * @param numElements  lower bound on initial capacity of the deque
-     */
+    //指定初始容量的构造方法,但是都会把容量升级为最小的2的倍数
+    //allocateElements用于升级容量至最小的2的倍数,这将在后面详解
     public ArrayDeque(int numElements) {
         allocateElements(numElements);
     }
 
-    /**
-     * Constructs a deque containing the elements of the specified
-     * collection, in the order they are returned by the collection's
-     * iterator.  (The first element returned by the collection's
-     * iterator becomes the first element, or <i>front</i> of the
-     * deque.)
-     *
-     * @param c the collection whose elements are to be placed into the deque
-     * @throws NullPointerException if the specified collection is null
-     */
+    //使用一个集合初始化队列,但是还是首先会把容量扩充至最最近的2的倍数,
+    //然后再将原集合中的左右元素拷贝至队列中
     public ArrayDeque(Collection<? extends E> c) {
         allocateElements(c.size());
         addAll(c);
@@ -189,6 +145,99 @@ public class ArrayDeque<E> extends AbstractCollection<E>
 
 ```
 
+可以看到,最重要的就是扩充容量函数`allocateElements`,这个函数比较复杂,有点难理解。
+
+``` java
+
+    //该函数内部调用了calculateSize计算新的容量(计算最近的2的倍数)
+    //然后分配数组
+    private void allocateElements(int numElements) {
+        elements = new Object[calculateSize(numElements)];
+    }
+
+
+    private static int calculateSize(int numElements) {
+        int initialCapacity = MIN_INITIAL_CAPACITY;
+        // Find the best power of two to hold elements.
+        // Tests "<=" because arrays aren't kept full即可.
+        //如果目标容量还小于规定的最小容量8,那么直接返回即可
+        if (numElements >= initialCapacity) {
+            initialCapacity = numElements;
+            initialCapacity |= (initialCapacity >>>  1);
+            initialCapacity |= (initialCapacity >>>  2);
+            initialCapacity |= (initialCapacity >>>  4);
+            initialCapacity |= (initialCapacity >>>  8);
+            initialCapacity |= (initialCapacity >>> 16);
+            initialCapacity++;
+
+            if (initialCapacity < 0)   // Too many elements, must back off
+                initialCapacity >>>= 1;// Good luck allocating 2 ^ 30 elements
+        }
+        return initialCapacity;
+    }
+```
+
+可以看到`calculateSize()`的代码很魔性,很有必要好好解释一哈。以下面32bit的数(作为初始容量newElements)为例:
+
+> 0000 0010 1101 0011 0000 0000 0000 0000
+
+目标数据为离newElements最近的2的整数:
+
+> 0000 0100 0000 0000 0000 0000 0000 0000
+
+操作步骤如下:
+
+1. 先执行`initialCapacity |= (initialCapacity >>>  1)`,即将`initialCapacity`无符号向右移动1位:
+
+> 0000 0001 0110 1001 1000 0000 0000 0000
+
+然后与`initialCapacity`进行或操作更新`initialCapacity`,
+
+> 0000 0011 1111 1011 1000 0000 0000 0000
+这样就保证了左边第1位和第2位都为1。
+
+2. 再执行`initialCapacity |= (initialCapacity >>>  2)`,将`initialCapacity`无符号向右移动2位:
+
+> 0000 0000 1111 1110 1110 0000 0000 0000
+
+然后与自身进行或操作更新`initialCapacity`,这样就保证了从左侧第一个1开始,后四位都是1。
+
+> 0000 0011 1111 1111 1110 0000 0000 0000
+
+3. 执行`initialCapacity |= (initialCapacity >>>  4)`,将`initialCapacity`无符号向右移动4位:
+
+> 0000 0000 0011 1111 1111 1110 0000 0000
+
+然后与自身进行或操作更新`initialCapacity`,这样就保证了从左侧第一个1开始,后八位都是1。
+
+> 0000 0011 1111 1111 1111 1110 0000 0000
+
+4. 执行`initialCapacity |= (initialCapacity >>>  8)`,将`initialCapacity`无符号向右移动8位:
+
+> 0000 0000 0000 0011 1111 1111 1111 1110
+
+然后与自身进行或操作更新`initialCapacity`,这样就保证了从左侧第一个1开始,后十六位都是1。
+
+> 0000 0011 1111 1111 1111 1111 1111 1110
+
+5. 执行`initialCapacity |= (initialCapacity >>>  16)`,将`initialCapacity`无符号向右移动16位:
+
+> 0000 0000 0000 0000 0000 0011 1111 1111 
+
+然后与自身进行或操作更新`initialCapacity`,这样就保证了从左侧第一个1开始,后三十二位都是1(当然最右边会有些bit丢失,但是这并没有关系。
+
+> 0000 0011 1111 1111 1111 1111 1111 1111
+
+6.最后将自身加1,就得到了目标数据:
+
+> 0000 0100 0000 0000 0000 0000 0000 0000
+
+是离`0000 0010 1101 0011 0000 0000 0000 0000`最近的2的整数倍容量。我只能说,这段代码是真的妙,太妙了。
+
+然后如果传进来的目标容易第31为1,那么求得的新容量第32位就会变为1,变成了负数2^31,所以还需要处理以下,如果新容量发生溢出,那么就将2^32向右移一位,返回
+2^30,这已经是`ArrayDeque`的极限容量。
+
+对于`ArrayDeque`的增删查方法也值得我们关注。
 
 ``` java
 
@@ -313,33 +362,7 @@ public class ArrayDeque<E> extends AbstractCollection<E>
 
     // ******  Array allocation and resizing utilities ******
 
-    private static int calculateSize(int numElements) {
-        int initialCapacity = MIN_INITIAL_CAPACITY;
-        // Find the best power of two to hold elements.
-        // Tests "<=" because arrays aren't kept full.
-        if (numElements >= initialCapacity) {
-            initialCapacity = numElements;
-            initialCapacity |= (initialCapacity >>>  1);
-            initialCapacity |= (initialCapacity >>>  2);
-            initialCapacity |= (initialCapacity >>>  4);
-            initialCapacity |= (initialCapacity >>>  8);
-            initialCapacity |= (initialCapacity >>> 16);
-            initialCapacity++;
 
-            if (initialCapacity < 0)   // Too many elements, must back off
-                initialCapacity >>>= 1;// Good luck allocating 2 ^ 30 elements
-        }
-        return initialCapacity;
-    }
-
-    /**
-     * Allocates empty array to hold the given number of elements.
-     *
-     * @param numElements  the number of elements to hold
-     */
-    private void allocateElements(int numElements) {
-        elements = new Object[calculateSize(numElements)];
-    }
 
     /**
      * Doubles the capacity of this deque.  Call only when full, i.e.,
