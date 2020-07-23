@@ -47,6 +47,13 @@ overlayFS分为四个部分:
 - upper dir是可读可写的
 - overlayFS具有copyup的特性。也就是如果想对lower dir中的文件进行写入,只能将文件拷贝至upper dir,然后再进行写入。
 
+### overlayFS的写入操作
+
+
+
+
+### overlayFS的删除操作
+
 这就是所谓的堆叠文件系统。详细介绍请移步:
 
 - [overlayFS的基本介绍](https://blog.csdn.net/luckyapple1028/article/details/77916194)
