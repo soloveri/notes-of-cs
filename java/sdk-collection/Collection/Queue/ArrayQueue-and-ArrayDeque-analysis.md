@@ -473,6 +473,16 @@ occurrence系列有两个方法,`removeFirstOccurrence`是删除第一次出现�
 ```
 ## 0x3 课后总结
 
-ArrayDeque采用数组实现循环队列。在单线程中,比LinkedList作为队列快,不过一般没啥人用吧,就当为分析LinkedList提前开路了。
+ArrayDeque采用数组实现循环队列,容量始终是2次幂。在单线程中:
+
+- 作为栈,比`Stack`快,因为不需要保证线程安全
+- 作为队列比LinkedList快,因为不需要构造节点
+
+不过一般没啥人用吧,就当为分析LinkedList提前开路了。
+
+
+## 参考文献
+
+https://www.jianshu.com/p/1c1c3f24762e
 
 
