@@ -247,6 +247,8 @@ size文件表示当前chainID对应的image layer的大小。
 
 最后以上述的四层ubuntu image为例,将iamgedb、layerdb、image layer、init layer、contain layer联合到一起。
 
+![layout](images/layout.drawio.svg)
+?
 
 ![temp](images/temp.png)
 
