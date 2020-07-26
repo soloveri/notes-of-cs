@@ -12,7 +12,7 @@ categories:
 
 一定要将登录用户切换为root才能查看Docker的文件架构！！！
 
-## 0x1 基本文件布局
+## 0x0 基本文件布局
 
 Docker的文件主要都存储在`/var/lib/docker`目录下,文件目录如下所示:
 
@@ -23,7 +23,7 @@ Docker的文件主要都存储在`/var/lib/docker`目录下,文件目录如下�
 - overlayFS
 - overlay2
 
-### overlayFS
+## 0x1 overlayFS
 
 其中overlayFS是一种类似于aufs的文件堆叠系统,但是比aufs更快。本质上来说,overlayFS是属于linux内核驱动的一部分。
 
@@ -47,7 +47,7 @@ overlayFS分为四个部分:
 - overlayFS具有copy-up的特性。也就是如果想对lower dir中的文件进行写入,只能将文件拷贝至upper dir,然后再对拷贝后的文件进行写入。
 
 
-#### overlayFS的挂载
+### 0x1-1 overlayFS的挂载
 
 overlayFS的基本用法可以参考[官网](https://wiki.archlinux.org/index.php/Overlay_filesystem)。下面是我参照[overlayFS的基本使用](https://blog.csdn.net/luckyapple1028/article/details/78075358)做的一个复现。
 
@@ -81,7 +81,7 @@ overlayFS的基本用法可以参考[官网](https://wiki.archlinux.org/index.ph
 
 可以看到确实将同名的底层文件都隐藏了起来。
 
-#### overlayFS的写入操作
+### 0x1-2 overlayFS的写入操作
 
 upper dir是一个可读可写层,而lower dir是只读层。所以如果我们想要写入的文件来自upper dir,那就是直接写入,在此就不举例说明了;如果来自lower dir,就会先将文件复制到upper再写入。这就是所谓的copy-up特性。
 
@@ -91,7 +91,7 @@ upper dir是一个可读可写层,而lower dir是只读层。所以如果我们�
 
 可以看到,我们在挂载点向lower层的文件写入内容后,upper层直接复制了了`lower1/dir/aa`,并直接追加写入的内容。而`lower1/dir/aa`本身的内容的却没有改变。
 
-#### overlayFS的删除操作
+### 0x1-3 overlayFS的删除操作
 
 overlayFS中的删除并不是真正的删除,它只是使用了一个障眼法-**whiteout**文件来覆盖同名文件,让用户以为已经把文件删除了。
 
@@ -127,7 +127,7 @@ overlayFS中的删除并不是真正的删除,它只是使用了一个障眼法-
 - [overlayFS的基本介绍](https://blog.csdn.net/luckyapple1028/article/details/77916194)
 - [overlayFS的基本使用](https://blog.csdn.net/luckyapple1028/article/details/78075358)
 
-### overlay2
+## 0x2 overlay2
 
 docker为overlayFS提供了了两个存储驱动,一个是原始的overlay,另外一个就是现在新版的overlay2。所以docker自然也采用了堆叠的方式存储镜像。
 
@@ -147,7 +147,7 @@ docker为overlayFS提供了了两个存储驱动,一个是原始的overlay,另�
 
 那么这些这些目录是怎么和镜像关联起来的呢？答案是通过元数据进行关联。元数据又分为image元数据和layer数据。
 
-#### image元数据
+### 0x2-1 image元数据
 
 image元数据存储在`/var/lib/docker/image/<storage_driver>/imagedb/content/sha256/`目录,文件名称是对应的iamge id,如下所示:
 
@@ -161,7 +161,7 @@ image元数据存储在`/var/lib/docker/image/<storage_driver>/imagedb/content/s
 
 那么image是又如何关联到layer的呢？docker是通过image元数据中的diff_id与一些历史信息计算出chainID关联到layer元数据,layer元数据再关联到对应的image layer。
 
-#### layer元数据
+### 0x2-2 layer元数据
 
 ![layerdb](images/layerdb.png)
 
@@ -169,7 +169,7 @@ image元数据存储在`/var/lib/docker/image/<storage_driver>/imagedb/content/s
 
 每个chainID目录都有三个共同的文件`cache-id`、`diff`、`size`,而有的没有`parent`。下面一一解析下各个文件的内容。
 
-##### cache-id
+### cache-id
 
 刚才说到layerdb保存的毕竟是元数据,那么这些元数据到底是怎么和具体数据链接起来呢?其中的`cache-id`是关键。
 
@@ -181,15 +181,15 @@ docker随机生成的uuid，内容是保存image layer的目录索引。其中�
 
 ![](images/ubuntu-tree.png)
 
-##### size
+####size
 
 size文件表示当前chainID对应的image layer的大小。
 
-##### diff
+#### diff
 
 保存了当前chainID对应的diff_id。
 
-##### parent
+#### parent
 
 这里的parent保存的是在`rootfs`中:位置较下的diff_id的上一个diff_id的chainID。
 
@@ -197,15 +197,13 @@ size文件表示当前chainID对应的image layer的大小。
 
 ![255-diff](images/2515-diff.png)
 
-其对应的diff_id为`8eeb`。
-
-再来查看其`parent`文件:
+其对应的diff_id为`8eeb`。再来查看其`parent`文件:
 
 ![255-parent](images/2515-parent.png)
 
-而在`rootfs`中,`8eeb`的上一个diff_id就是`ce30`(因为第一个位置的diff_id与chainID相同)。
+而在`rootfs`中,`8eeb`的上一个diff_id对应的chainID就是`ce30`(因为第一个位置的diff_id与chainID相同)。
 
-##### overlay2的挂载
+### 0x2-3 overlay2的挂载
 
 挂载的信息存储在`/var/lib/docker/image/layerdb/mounts`目录下,每个目录名称就是对应的容器ID,如下图所示:
 
@@ -243,28 +241,41 @@ size文件表示当前chainID对应的image layer的大小。
     "/dev/console":     "file",
     "/etc/mtab":        "/proc/mounts",
 
-注意:init layer是一个只读层。
+**注意:init layer是一个只读层。**
 
 最后以上述的四层ubuntu image为例,将iamgedb、layerdb、image layer、init layer、contain layer联合到一起。
 
 ![layout](images/layout.drawio.svg)
-?
 
-![temp](images/temp.png)
+可以看到和挂载命令基本一致:
+
+![mount](images/docker-mount.png)
+
+其中挂载都是使用的符号链接,upper就是diff目录,work目录与diff目录同级。
+
+### 0x2-4 overlay2的删除操作
+
+删除分为删除image与删除container。
+
+- 删除container:首先需要停止想要删除的容器:`docker stop [container ID]`,然后删除容器:`docker rm [container ID]`
+- 删除image:在删除image前,一定要删除container,完成上述步骤后,直接`docker rmi [image id]`即可。
+
+## 0x3 小结
+
+1. docker在每次创建容器时都会自动添加一个init layer对容器进行初始化,添加contain layer面向用户。并且每次默认启动的容器都是不相同的。
+
+2. docker对于每种文件驱动,都会在`docker/image`下创建同名文件以保存元数据。docker通过imagedb、layerdb、关联到具体的image layer。
+
+## 参考文献
+
+1. [docker 存储驱之overlayFS](https://blog.51cto.com/haoyonghui/2457915)
+
+2. [深入理解overlayfs（一）：初识](https://blog.csdn.net/luckyapple1028/article/details/77916194)
+
+3. [深入理解overlayfs（二）：使用与原理分析](https://blog.csdn.net/luckyapple1028/article/details/78075358)
+
+4. [Docker镜像存储-overlayfs](https://www.cnblogs.com/sammyliu/p/5877964.html)
+
+5. [docker一站式学习](https://www.cnblogs.com/sammyliu/p/5877964.html)
 
 
-
-其中images layer相当于lower dir,containers layer相当于upper dir,最后挂载到容器指定的挂载点(merged目录)
-
-
-https://blog.51cto.com/haoyonghui/2457915
-
-https://blog.csdn.net/luckyapple1028/article/details/77916194
-
-https://gowa.club/Docker/Docker%E7%9A%84overlay2%E7%AE%80%E8%BF%B0.html
-
-https://www.codenong.com/js95e91aa62d46/
-
-https://www.cnblogs.com/sammyliu/p/5877964.html
-
-https://www.jianshu.com/p/3826859a6d6e
