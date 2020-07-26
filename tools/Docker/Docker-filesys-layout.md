@@ -67,9 +67,9 @@ overlayFS的基本用法可以参考[官网](https://wiki.archlinux.org/index.ph
 
 > sudo mount -t overlay overlay -o lowerdir=lower1:lower2,upperdir=upper,workdir=work merge
 
-注意`workdir`和`merge`之间是没有`,`的。`lowerdir`后面的目录是有顺序的,排在前面的lower dir在lower这个层次中的排名就较前,也就是如上面第一张图所示:
+注意`workdir`和`merge`之间是没有`,`的。`lowerdir`后面的目录是有顺序的,排在前面的lower dir在lower这个层次中的排名就较前,也就是如开头部分的图片所示:
 
-![overlayFS](images/overlayFs.jfif)
+![overlayFS](images/overlayFS.jfif)
 
 挂载后merge目录下的结构如下:
 
