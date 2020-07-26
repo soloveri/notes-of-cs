@@ -181,7 +181,7 @@ docker随机生成的uuid，内容是保存image layer的目录索引。其中�
 
 ![](images/ubuntu-tree.png)
 
-####size
+#### size
 
 size文件表示当前chainID对应的image layer的大小。
 
