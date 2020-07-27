@@ -18,7 +18,7 @@ categories:
 
 更新:2020-07-23 19:12:32
 
-现在懂了,如果对于**容量有限**的队列,比如`ArrayBlockingQueue`,它是继承自抽象类`AbstractQueue`,如果调用其`offer`方法(在`AbstractQueue`中实现),添加元素失败后只会返回true,否则返回false。而调用`add`的话,如果插入失败,就会抛出状态异常。所以说,offer类方法可用于检查队列是否已满,比add类方法优秀点。
+现在懂了,如果对于**容量有限**的队列,比如`ArrayBlockingQueue`,它是继承自抽象类`AbstractQueue`,如果调用其`offer`方法(在`AbstractQueue`中实现),添加元素失败后只会返回true,否则返回false。而调用`add`的话,如果插入失败,就会抛出状态异常。所以说,offer类方法可用于检查队列是否已满,比add类方法优秀点。但是对于`LinkedList`、`ArrayQueue`等带自动扩容属性的队列来说,二者效果差不多,不过offer类可以返回操作是否成功的信息。还是推荐使用offer类。
 
 两组方法如下图所示:
 
