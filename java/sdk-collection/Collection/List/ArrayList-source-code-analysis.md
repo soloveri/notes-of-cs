@@ -249,6 +249,7 @@ public static int newLength(int oldLength, int minGrowth, int prefGrowth) {
         // assert oldLength >= 0
         // assert minGrowth > 0
 
+        //在最小增长大小和最适应增当大小之间选一个,并加上原来的大小,不出意外就是扩充为原来的1.5倍
         int newLength = Math.max(minGrowth, prefGrowth) + oldLength;
         //如果计算出的新大小没有超过MAX_ARRAY_LENGTH=Integer.MAX_VALUE-8
         //那么就返回新计算出的大小
