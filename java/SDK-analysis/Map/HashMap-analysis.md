@@ -215,9 +215,180 @@ rehash operations.  If the initial capacity is greater than the maximum number o
 
 ## 0x1 HashMap的属性
 
+HashMap中的magic number在上面已经分析过,下面是HashMap的一些属性:
 
+``` java
+    /**
+    * The table, initialized on first use, and resized as
+    * necessary. When allocated, length is always a power of two.
+    * (We also tolerate length zero in some operations to allow
+    * bootstrapping mechanics that are currently not needed.)
+    */
+    //用来存储bucket的底层数组,无论是初始化HashMap还是扩容,容量一直都是2的整数幂
+    //当然上面也指出了在某些时候允许长度为0,从而允许一些当前不需要的引导机制????这是啥意思
+    transient Node<K,V>[] table;
+
+    /**
+    * Holds cached entrySet(). Note that AbstractMap fields are used
+    * for keySet() and values().
+    */
+    transient Set<Map.Entry<K,V>> entrySet;
+
+    /**
+    * The number of key-value mappings contained in this map.
+    */
+    //这是HashMap中实际的Entry数量,不是容量哦
+    transient int size;
+
+    /**
+    * The number of times this HashMap has been structurally modified
+    * Structural modifications are those that change the number of mappings in
+    * the HashMap or otherwise modify its internal structure (e.g.,
+    * rehash).  This field is used to make iterators on Collection-views of
+    * the HashMap fail-fast.  (See ConcurrentModificationException).
+    */
+    //modCount曾在分析ArrayList的源码解释过,用于支持fast-fail机制,从而也说明HashMap是线程不安全的
+    transient int modCount;
+
+    /**
+    * The next size value at which to resize (capacity * load factor).
+    *
+    * @serial
+    */
+    // (The javadoc description is true upon serialization.
+    // Additionally, if the table array has not been allocated, this
+    // field holds the initial array capacity, or zero signifying
+    // DEFAULT_INITIAL_CAPACITY.)
+    
+    //注释中的大致意思就是下一次扩容时的容量,如果HashMap还未初始化,那么就存储初始化的容量,或者0(表示默认初始化容量)
+    int threshold;
+
+    /**
+    * The load factor for the hash table.
+    *
+    * @serial
+    */
+    //HashMap的装载因子,一旦确定,不可更改
+    final float loadFactor;
+```
+
+`table`数组的元素是Node,这又是什么呢?来一起康康:
+
+``` java
+static class Node<K,V> implements Map.Entry<K,V> {
+        //key的Hash值,是一个32bit的int,不可更改
+        final int hash;
+        //key,不可更改
+        final K key;
+        V value;
+        //next指针,因为刚开始就是使用链表存储的Entry的
+        Node<K,V> next;
+        //构造函数
+        //注意:没有默认构造函数
+        Node(int hash, K key, V value, Node<K,V> next) {
+            this.hash = hash;
+            this.key = key;
+            this.value = value;
+            this.next = next;
+        }
+
+        public final K getKey()        { return key; }
+        public final V getValue()      { return value; }
+        public final String toString() { return key + "=" + value; }
+
+        public final int hashCode() {
+            return Objects.hashCode(key) ^ Objects.hashCode(value);
+        }
+
+        public final V setValue(V newValue) {
+            V oldValue = value;
+            value = newValue;
+            return oldValue;
+        }
+
+        public final boolean equals(Object o) {
+            if (o == this)
+                return true;
+            if (o instanceof Map.Entry) {
+                Map.Entry<?,?> e = (Map.Entry<?,?>)o;
+                if (Objects.equals(key, e.getKey()) &&
+                    Objects.equals(value, e.getValue()))
+                    return true;
+            }
+            return false;
+        }
+    }
+```
+
+从上面可以看出,Node是在HashMap使用链表存储模式的key-value的一个wrapper类。而`Map.Entry`是在`Map`接口中定义的一个内部接口,规定了一些`Entry`必须实现的方法。基本上就可以说这个`Entry`就相当于c++中的`pair`结构。保存一对key-value。
+
+`Comparator`是函数式接口,虽然有两个抽象方法,但是`equals`方法是继承自Object的,从Object继承过来的public
+
+## 0x2 HashMap的构造方法
 
 ## 0x2 HashMap中的常用方法
+
+### 增
+
+``` java
+public V put(K key, V value) {
+        return putVal(hash(key), key, value, false, true);
+    }
+
+    /**
+     * Implements Map.put and related methods.
+     *
+     * @param hash hash for key
+     * @param key the key
+     * @param value the value to put
+     * @param onlyIfAbsent if true, don't change existing value
+     * @param evict if false, the table is in creation mode.
+     * @return previous value, or null if none
+     */
+    final V putVal(int hash, K key, V value, boolean onlyIfAbsent,
+                   boolean evict) {
+        Node<K,V>[] tab; Node<K,V> p; int n, i;
+        if ((tab = table) == null || (n = tab.length) == 0)
+            n = (tab = resize()).length;
+        if ((p = tab[i = (n - 1) & hash]) == null)
+            tab[i] = newNode(hash, key, value, null);
+        else {
+            Node<K,V> e; K k;
+            if (p.hash == hash &&
+                ((k = p.key) == key || (key != null && key.equals(k))))
+                e = p;
+            else if (p instanceof TreeNode)
+                e = ((TreeNode<K,V>)p).putTreeVal(this, tab, hash, key, value);
+            else {
+                for (int binCount = 0; ; ++binCount) {
+                    if ((e = p.next) == null) {
+                        p.next = newNode(hash, key, value, null);
+                        if (binCount >= TREEIFY_THRESHOLD - 1) // -1 for 1st
+                            treeifyBin(tab, hash);
+                        break;
+                    }
+                    if (e.hash == hash &&
+                        ((k = e.key) == key || (key != null && key.equals(k))))
+                        break;
+                    p = e;
+                }
+            }
+            if (e != null) { // existing mapping for key
+                V oldValue = e.value;
+                if (!onlyIfAbsent || oldValue == null)
+                    e.value = value;
+                afterNodeAccess(e);
+                return oldValue;
+            }
+        }
+        ++modCount;
+        if (++size > threshold)
+            resize();
+        afterNodeInsertion(evict);
+        return null;
+    }
+
+```
 
 
 ## 0x3 与JDK1.7的HashMap异同
