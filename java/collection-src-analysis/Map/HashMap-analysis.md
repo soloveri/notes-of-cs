@@ -92,7 +92,7 @@ HashMap中定义了一些比较重要的常量,如下所示:
 
 tab就是用来存储bucket的数组。n是数组的容量。如果n是2的整数幂,那么`(n-1)& hash== hash% n`,其中hash是一个32位整数。没错,就是这么神奇。这样计算索引只需移位操作,比取模更快。所以都是2的整数幂。
 
-对于第二点:每次HashMap扩容都是变为原来的两倍,扩容是一个代价高昂的操作。在扩容时不仅需要复制元素,而且需要更新对应的索引。如果HashMap的容量都是2的整数幂。那么它的索引要么在原来位置,要么偏移了2的整数次幂。
+对于第二点:每次HashMap扩容都是变为原来的两倍,扩容是一个代价高昂的操作。在扩容时不仅需要复制元素,而且需要更新对应的索引。如果HashMap的容量都是2的整数幂。那么它的索引要么在原来位置,要么偏移了2的整数次幂(**偏移了原始容量的距离**)。
 
 对于这一点,我们随便设一个hash做验证,令hashcode=0x00008435。未扩容前的容量为2^4=16。那么当前计算出的索引:
 >0000 0000 0000 0000 1000 0100 0001 0101 -> hash
@@ -121,6 +121,7 @@ tab就是用来存储bucket的数组。n是数组的容量。如果n是2的整�
 ``` java
 static final int hash(Object key) {
     int h;
+    //null的hash为0
     return (key == null) ? 0 : (h = key.hashCode()) ^ (h >>> 16);
     //这里调用的key的hashCode方法,实际上调用的key的具体实现类,而不是Object的hashCode
 }
@@ -133,6 +134,8 @@ static final int hash(Object key) {
 现在进行索引的计算(map容量为16):`(n-1) & 16`。计算出的结果都为`101b`,发生了hash碰撞。但是这两个数差别还是蛮大的。所以将对象的原始hash的高16位与低16位异或,这么做也是为了在低16中保留高16位的特性,加大低16位的随机性。
 
 所以说最终目的就是为了**防止hash碰撞**。JDK1.7的hash算法并不怎么随机,曾经产生了dos攻击。[HASH COLLISION DOS 问题](https://coolshell.cn/articles/6424.html)
+
+**最后,null的hash为0!**
 
 ### 0x0-2 为什么HashMap的默认容量为16?
 
@@ -272,6 +275,10 @@ HashMap中的magic number在上面已经分析过,下面是HashMap的一些属�
     final float loadFactor;
 ```
 
+更新:2020-08-02 18:57:49
+
+`HashMap`中的`threshold`=`loadFactor*capacity`,并**不是**下一次扩容的容量,当然如果HashMap还未初始化,并且用户指定了初始化容量,那么存储的就是根据用户指定容量计算出的元素数量阈值,否则0就是表示默认值12。       
+
 `table`数组的元素是Node,这又是什么呢?来一起康康:
 
 ``` java
@@ -320,73 +327,553 @@ static class Node<K,V> implements Map.Entry<K,V> {
     }
 ```
 
-从上面可以看出,Node是在HashMap使用链表存储模式的key-value的一个wrapper类。而`Map.Entry`是在`Map`接口中定义的一个内部接口,规定了一些`Entry`必须实现的方法。基本上就可以说这个`Entry`就相当于c++中的`pair`结构。保存一对key-value。
+从上面可以看出,Node是在HashMap使用链表存储模式时一组key-value的wrapper类。而`Map.Entry`是在`Map`接口中定义的一个内部接口,规定了一些`Entry`必须实现的方法。基本上就可以说这个`Entry`就相当于c++中的`pair`结构。保存一对key-value。`Entry`的定义如下:
 
-`Comparator`是函数式接口,虽然有两个抽象方法,但是`equals`方法是继承自Object的,从Object继承过来的public
+``` java
+
+interface Entry<K,V> {
+    K getKey();
+
+    V getValue();
+
+    V setValue(V value);
+
+    boolean equals(Object o);
+
+    int hashCode();
+
+    public static <K extends Comparable<? super K>, V> Comparator<Map.Entry<K,V>> comparingByKey() {
+        return (Comparator<Map.Entry<K, V>> & Serializable)
+            (c1, c2) -> c1.getKey().compareTo(c2.getKey());
+    }
+
+    public static <K, V extends Comparable<? super V>> Comparator<Map.Entry<K,V>> comparingByValue() {
+        return (Comparator<Map.Entry<K, V>> & Serializable)
+            (c1, c2) -> c1.getValue().compareTo(c2.getValue());
+    }
+
+    public static <K, V> Comparator<Map.Entry<K, V>> comparingByKey(Comparator<? super K> cmp) {
+        Objects.requireNonNull(cmp);
+        return (Comparator<Map.Entry<K, V>> & Serializable)
+            (c1, c2) -> cmp.compare(c1.getKey(), c2.getKey());
+    }
+    
+    public static <K, V> Comparator<Map.Entry<K, V>> comparingByValue(Comparator<? super V> cmp) {
+        Objects.requireNonNull(cmp);
+        return (Comparator<Map.Entry<K, V>> & Serializable)
+            (c1, c2) -> cmp.compare(c1.getValue(), c2.getValue());
+    }
+}
+```
+
+在`Entry`中定义了四个获取比较器的静态方法,对于不熟悉java8新语法的同学来说,静态方法内部的实现可能让人摸不着头脑。
+
+首先,`(c1, c2) -> c1.getKey().compareTo(c2.getKey());`其实是lambda表达式,它的一般格式如下:
+
+>(type1 arg1,type2 arg2...)->{ body...}
+
+lambda有[以下特点](http://blog.oneapm.com/apm-tech/226.html):
+
+- 一个 Lambda 表达式可以有零个或多个参数
+- 参数的类型既可以明确声明，也可以根据上下文来推断。例如：(int a)与(a)效果相同
+- 所有参数需包含在圆括号内，参数之间用逗号相隔。例如：(a, b) 或 (String a, int b, float c)
+空圆括号代表参数集为空。例如：() -> 42
+- 当只有一个参数，且其类型可推导时，**圆括号**（）可省略。例如：a -> return a*a
+- Lambda 表达式的主体可包含零条或多条语句
+- 如果 Lambda 表达式的主体只有**一条**语句，**花括号**{}可省略。匿名函数的返回类型与该主体表达式一致
+- 如果 Lambda 表达式的主体包含一条以上语句，则表达式必须包含在花括号{}中（形成代码块）。匿名函数的返回类型与代码块的返回类型一致，若没有返回则为空
+
+关于lambda表达式更高级知识可以了解一下函数式语言中的闭包,java中的lambda就是最接近闭包的概念。
+
+接下来再看看为什么一个lambda表达式能够强转为接口。`Comparator`是一个函数式接口(`@FunctionalInterface`)。函数式接口的标准就是其内部只能定义一个抽象方法。在java8中,每个lambda表达式都能隐式的赋值给函数时接口。当然lambda表达式的返回值和参数得和接口中定义的抽象方法一样才行。
+
+然而我们去实际看`Comparator`接口源码时,却发现`Comparator`有两个抽象方法:
+
+``` java
+@FunctionalInterface
+public interface Comparator<T> {
+    int compare(T o1, T o2);
+    boolean equals(Object obj);
+    ...
+}
+```
+竟然和函数式接口的定义不一样?然而答案在`FunctionInterface`的[官方文档](https://docs.oracle.com/javase/8/docs/api/java/lang/FunctionalInterface.html)中。
+>If an interface declares an abstract method overriding one of the public methods of java.lang.Object, that also does not count toward the interface's abstract method count since any implementation of the interface will have an implementation from java.lang.Object or elsewhere.
+
+意思就是说如果函数式接口的抽象方法如果重写自`object`,那么是不计入函数式接口定义的方法个数中的,因为`Object`中的方法肯定都会在自身中实现或者override于其他地方。
+
+最后强转的类型是竟然是`(Comparator<Map.Entry<K, V>> & Serializable)`,两个类型还能进行与操作?
+
+其实这也是java8中的新语法,StackOverflow上关于此问题的[回答](https://stackoverflow.com/questions/28509596/java-lambda-expressions-casting-and-comparators)如下:
+
+>The lambda is initialized with its target type as Comparator and Serializable. Note the return type of method is just Comparator, but because Serializable is also inscribed to it while initialization, it can always be serialized even though this message is lost in method signature.
+
+简而言之就是lambda表达式的初始化的目标类型是`Comparator`和`Serializable`。但是最后的**返回类型**却只是`Comparator`,但是`Serializable`类型已经在表达式初始化时注册(inscribe)过了。所以尽管在函数签名中丢失了该信息,但是返回值是一定总是可以初始化的。
+
+ok,经过上述的简单科普,相信返回比较器的代码实现已经不是问题了。上述所有的点都是java8的新语法,包括在接口中定义`default`方法和`static`方法。
 
 ## 0x2 HashMap的构造方法
 
+`HashMap`总共有4个构造方法,除了`HashMap(Map<? extends K, ? extends V> m)`以外,其他3个构造函数都是仅仅设置装载因子`load factor`,在这三个构造函数中,除了默认构造函数,~~另外两个都会设置初始容量~~。
+
+~~这里传入的初始容量仅仅是为了设置threshold,而不是设置初始容量~~,这里再次收回所说的话,虽然表面上看仅仅是将传入容量修正为最近的2的整数幂,并赋值给threshold。
+
+**但是在第一次put元素时**,会将刚才设置好的threshold赋值给table的新容量,也就实现的指定HashMap的容量的操作。但是这三个构造都不会进行table内存的分配,**只会在第一次put时调用resize()进行分配**。
+
+``` java
+
+    public HashMap(int initialCapacity, float loadFactor) {
+        if (initialCapacity < 0)
+            throw new IllegalArgumentException("Illegal initial capacity: " +
+                                               initialCapacity);
+        if (initialCapacity > MAXIMUM_CAPACITY)
+            initialCapacity = MAXIMUM_CAPACITY;
+        if (loadFactor <= 0 || Float.isNaN(loadFactor))
+            throw new IllegalArgumentException("Illegal load factor: " +
+                                               loadFactor);
+        this.loadFactor = loadFactor;
+        this.threshold = tableSizeFor(initialCapacity);
+    }
+
+    
+    public HashMap(int initialCapacity) {
+        this(initialCapacity, DEFAULT_LOAD_FACTOR);
+    }
+
+    //默认构造函数不会设置threshold
+    public HashMap() {
+        this.loadFactor = DEFAULT_LOAD_FACTOR; // all other fields defaulted
+    }
+
+    //会在putEntries中设置threshold    
+    public HashMap(Map<? extends K, ? extends V> m) {
+        this.loadFactor = DEFAULT_LOAD_FACTOR;
+        putMapEntries(m, false);
+    }
+
+```
+在第四个使用`Map`对象构造HashMap的构造函数中,其调用了`putMapEntries(Map,boolean)`方法,这个函数值得一提,因为其第二个参数的意义会在后面用到:
+
+``` java
+/**
+     * Implements Map.putAll and Map constructor.
+     *
+     * @param m the map
+     * @param evict false when initially constructing this map, else
+     * true (relayed to method afterNodeInsertion).
+     */
+    final void putMapEntries(Map<? extends K, ? extends V> m, boolean evict) {
+        int s = m.size();
+        if (s > 0) {
+            if (table == null) { // pre-size
+                //下面的操作是在计算完全存储m中的元素需要的capacity,注意不是threshold
+                
+                //下面的加1.0F是为在计算出的loadFactor为小数时向上取整
+                float ft = ((float)s / loadFactor) + 1.0F;
+                int t = ((ft < (float)MAXIMUM_CAPACITY) ?
+                         (int)ft : MAXIMUM_CAPACITY);
+                //查看所需的capacity是否比当前HashMap的扩容阈值还大,比阈值还大的情况下,不可能存储下m的所有元素,即使当前HashMap为空
+                //那么就需要更新当前HashMap的阈值
+                if (t > threshold)
+                    threshold = tableSizeFor(t);
+            }
+            //当调用HashMap的putAll方法时,会再次调用该方法执行到下面的else if 
+            //这里的resize相当于一次预判,如果m的元素个数比当前hashmap的元素个数阈值threshold还高的话
+            //那么即使当前HashMap为空,也无法存储m的所有元素,所以必须扩容
+            //当然即使s<=threshold,当前HashMap还是有可能存储不下,这会在putVal内部进行扩容
+            else if (s > threshold)
+                resize();
+            for (Map.Entry<? extends K, ? extends V> e : m.entrySet()) {
+                K key = e.getKey();
+                V value = e.getValue();
+                putVal(hash(key), key, value, false, evict);
+            }
+        }
+    } 
+```
+在`else if`中的扩容操作体现了HashMap的扩容懒汉模式,仅仅在已经确定没有足够空间存储的情况中才会进行扩容操作,因为扩容操作的代价太高了。
+
+**evict参数:**
+
+如果当前`HashMap`的table还未进行分配,那么就会将参数`evict`设置为false,表示当前正处于构造模式。这个单词本身的意思具有驱逐的意思,主要应用于`LinkedHashMap`构造`LRU`时使用。与`HashMap`中的意义不同。
+
+最后代码中经常使用`tableSizeFor(int)`方法就是把用户输入的容量调整到最近的2的整数幂。其代码与`ArrayQueue`的调整方式基本一致。
+``` java
+static final int tableSizeFor(int cap) {
+    int n = cap - 1;
+    n |= n >>> 1;
+    n |= n >>> 2;
+    n |= n >>> 4;
+    n |= n >>> 8;
+    n |= n >>> 16;
+    return (n < 0) ? 1 : (n >= MAXIMUM_CAPACITY) ? MAXIMUM_CAPACIT      Y : n + 1;
+}
+```
+唯一与`ArrayQueue`不同的时,当把容量调整到离cap最近的2的整数幂-1时:
+
+- 如果已经溢出,那么会将容量设为1
+- 如果此时的容量小于`2^31`但是大于`2^30`,那么就将容量修正为`2^30`
+- 否则最新容量就是最近的2的整数幂。
+        
 ## 0x2 HashMap中的常用方法
 
-### 增
+HashMap中最常用的就是`put(key,value)`函数与`remove`函数,而且这些函数还会包含RB树与list的相互转换,比较复杂。值得认真推敲。
+
+### put方法
+
+下面JDk1.8中,HashMap的`put`源码。其又在内部调用了`putVal`。
 
 ``` java
 public V put(K key, V value) {
-        return putVal(hash(key), key, value, false, true);
-    }
+    return putVal(hash(key), key, value, false, true);
+}
 
-    /**
-     * Implements Map.put and related methods.
-     *
-     * @param hash hash for key
-     * @param key the key
-     * @param value the value to put
-     * @param onlyIfAbsent if true, don't change existing value
-     * @param evict if false, the table is in creation mode.
-     * @return previous value, or null if none
-     */
-    final V putVal(int hash, K key, V value, boolean onlyIfAbsent,
-                   boolean evict) {
-        Node<K,V>[] tab; Node<K,V> p; int n, i;
-        if ((tab = table) == null || (n = tab.length) == 0)
-            n = (tab = resize()).length;
-        if ((p = tab[i = (n - 1) & hash]) == null)
-            tab[i] = newNode(hash, key, value, null);
-        else {
-            Node<K,V> e; K k;
-            if (p.hash == hash &&
-                ((k = p.key) == key || (key != null && key.equals(k))))
-                e = p;
-            else if (p instanceof TreeNode)
-                e = ((TreeNode<K,V>)p).putTreeVal(this, tab, hash, key, value);
-            else {
-                for (int binCount = 0; ; ++binCount) {
-                    if ((e = p.next) == null) {
-                        p.next = newNode(hash, key, value, null);
-                        if (binCount >= TREEIFY_THRESHOLD - 1) // -1 for 1st
-                            treeifyBin(tab, hash);
-                        break;
+final V putVal(int hash, K key, V value, boolean onlyIfAbsent,boolean evict) {
+...
+}
+```
+
+`putVal(int hash, K key, V value, boolean onlyIfAbsent,boolean evict)`有四个参数,其中前两个参数都好理解。第三个参数`onlyIfAbsent`为一个标志位:
+- 如果为false,表示对于相同key的value会进行覆盖
+- 为true则不会进行覆盖
+
+**在`HashMap`默认对相同key的value进行覆盖。** 最后一个参数`evict`已在介绍`putEntries`方法时介绍过。在`HashMap`表示是否处于创建模式,**默认为false**。
+
+在深入分析`putVal`方法之前,需要先了解一下`resize()`方法,下面是其源码:
+
+``` java
+/**
+    * Initializes or doubles table size.  If null, allocates in
+    * accord with initial capacity target held in field threshold.
+    * Otherwise, because we are using power-of-two expansion, the
+    * elements from each bin must either stay at same index, or move
+    * with a power of two offset in the new table.
+    *
+    * @return the table
+    */
+final Node<K,V>[] resize() {
+    Node<K,V>[] oldTab = table;
+    int oldCap = (oldTab == null) ? 0 : oldTab.length;
+    int oldThr = threshold;
+    int newCap, newThr = 0;
+    //如果HashMap不为空,已经是存储过元素了才会不为空
+    if (oldCap > 0) {
+        //如果当前容量已经超过最大容量了,已经没办法扩大了,那么就只会更新存储个数的阈值,只能利用剩下的25%空间
+        //无需进行复制
+        if (oldCap >= MAXIMUM_CAPACITY) {
+            threshold = Integer.MAX_VALUE;
+            return oldTab;
+        }
+        //这就是常规的对容量进行扩充一倍的操作
+        else if ((newCap = oldCap << 1) < MAXIMUM_CAPACITY &&
+                    //如果原始容量太小,那么threshold就会在后面进行自动计算
+                    //比如原始容量为4,原始threshold为3,但是newThr通过原始threshold左移一位也能正确
+                    //得出答案啊,为啥还要多此一举?
+                    oldCap >= DEFAULT_INITIAL_CAPACITY)
+            newThr = oldThr << 1; // double threshold
+    }
+    //仅仅是调用了能够设置初始容量的构造函数,但是还未put值
+    else if (oldThr > 0) // initial capacity was placed in threshold
+        newCap = oldThr;
+    //如果当前HashMap的table还未分配,也就是调用默认的无参构造函数
+    //此时threshold=0,就是分配默认大小的table
+    else {
+        //新的容量就是默认的初始化容量为16
+        newCap = DEFAULT_INITIAL_CAPACITY;
+        //设置新的threshold,新的threshold就是12
+        newThr = (int)(DEFAULT_LOAD_FACTOR * DEFAULT_INITIAL_CAPACITY);
+    }
+    //执行下面if语句只会有两种情况发生,一种就是调用能够设置初始容量的构造函数但还未put元素
+    //另外一种就是当前HashMap已经有元素,但是当前容量小于默认容量,也就是小于16
+    //因为如果调用默认构造函数,那么threshold在上面已经分配
+    //如果HashMap中已经有元素,也会直接设置好
+    if (newThr == 0) {
+        //通过用户的指定的容量进行threshold的计算
+        float ft = (float)newCap * loadFactor;
+        newThr = (newCap < MAXIMUM_CAPACITY && ft < (float)MAXIMUM_CAPACITY ?
+                    (int)ft : Integer.MAX_VALUE);
+    }
+    threshold = newThr;
+    @SuppressWarnings({"rawtypes","unchecked"})
+    Node<K,V>[] newTab = (Node<K,V>[])new Node[newCap];
+    table = newTab;
+    //已经设置好新的容量与新的threshold,如果原始HashMap不为空,那么就进行元素的复制
+    if (oldTab != null) {
+        //逐个拷贝
+        for (int j = 0; j < oldCap; ++j) {
+            Node<K,V> e;
+            if ((e = oldTab[j]) != null) {
+                oldTab[j] = null;
+                if (e.next == null)
+                    newTab[e.hash & (newCap - 1)] = e;
+                else if (e instanceof TreeNode)
+                    //如果是使用红黑树存储的,那么就把一棵树分裂成两颗树?这留着后面再分析
+                    ((TreeNode<K,V>)e).split(this, newTab, j, oldCap);
+                else { // preserve order
+                    //HashMap会把一个完整的链表分成高低两个链表,每个链表的具体个数取决元素hash的某一bit是否为1,概率各为50%,高表示当前使用的bit位为1,低表示bit位为0
+                    //所以理想情况下分成两个长度相等的链表
+
+                    //低链表的头尾
+                    Node<K,V> loHead = null, loTail = null;
+                    //高链表的头尾
+                    Node<K,V> hiHead = null, hiTail = null;
+                    Node<K,V> next;
+                    do {
+                        //尾插法
+                        next = e.next;
+                        //低链表,如果当前使用的bit为0,那么就使用尾插法加入到链表中
+                        if ((e.hash & oldCap) == 0) {
+                            if (loTail == null)
+                                loHead = e;
+                            else
+                                loTail.next = e;
+                            loTail = e;
+                        }
+                        else {
+                            if (hiTail == null)
+                                hiHead = e;
+                            else
+                                hiTail.next = e;
+                            hiTail = e;
+                        }
+                    } while ((e = next) != null);
+                    //这里为什么需要判断非null呢?因为有可能运气不好,元素全部聚集到low链表或high链表中
+                    if (loTail != null) {
+                        loTail.next = null;
+                        //如果是low链表,那么索引就会保持原位置不动
+                        newTab[j] = loHead;
                     }
-                    if (e.hash == hash &&
-                        ((k = e.key) == key || (key != null && key.equals(k))))
-                        break;
-                    p = e;
+                    if (hiTail != null) {
+                        hiTail.next = null;
+                        //如果是high表,那么索引就会偏移原来的容量的长度
+                        newTab[j + oldCap] = hiHead;
+                    }
                 }
             }
-            if (e != null) { // existing mapping for key
-                V oldValue = e.value;
-                if (!onlyIfAbsent || oldValue == null)
-                    e.value = value;
-                afterNodeAccess(e);
-                return oldValue;
+        }
+    }
+    return newTab;
+}
+```
+
+#### putVal方法
+
+老规矩,先把代码粘上来:
+
+``` java
+/**
+    * Implements Map.put and related methods.
+    *
+    * @param hash hash for key
+    * @param key the key
+    * @param value the value to put
+    * @param onlyIfAbsent if true, don't change existing value
+    * @param evict if false, the table is in creation mode.
+    * @return previous value, or null if none
+    */
+final V putVal(int hash, K key, V value, boolean onlyIfAbsent,
+                boolean evict) {
+    Node<K,V>[] tab; Node<K,V> p; int n, i;
+    if ((tab = table) == null || (n = tab.length) == 0)
+        n = (tab = resize()).length;
+        //前文说过,(n-1)&hash等价于hash%n,不同hash的key不可能取到同一个下标
+        //如果还没有创建过节点,那么创建新节点放到对应桶中即可
+    if ((p = tab[i = (n - 1) & hash]) == null)
+        tab[i] = newNode(hash, key, value, null);
+    //目标bucket已经有元素了,那么会有两种情况:
+    //要么是替换key对应的value,要么就是加入一个新节点    
+    else {
+        Node<K,V> e; K k;
+        //这里总是首先判断目标bucket中第一个元素是否和key是用一个元素,p就是第一个元素
+        if (p.hash == hash &&
+            ((k = p.key) == key || (key != null && key.equals(k)))) @Fisrt Question
+            //把bucket中的第一个元素赋值给e
+            e = p;
+        //如果目标bucket已经使用RB tree存储了,那么就调用TreeNode的putTreeVal方法存入新节点
+        else if (p instanceof TreeNode)
+            e = ((TreeNode<K,V>)p).putTreeVal(this, tab, hash, key, value);
+        //走到这里,说明bucket还是使用链表存储
+        //那么需要判断是加入新节点还是替换value
+        else {
+            for (int binCount = 0; ; ++binCount) {
+                if ((e = p.next) == null) {
+                    //链表已经遍历完了,还是没有找到相同的对象,说明用户的目的是插入新节点
+                    p.next = newNode(hash, key, value, null);
+                    //因为是从p.next开始遍历的,所以在插入第七个元素时,进行树化
+                    if (binCount >= TREEIFY_THRESHOLD - 1) // -1 for 1st
+                        treeifyBin(tab, hash);
+                    break;
+                }
+                //与上面的@First Question一样,判断我们当前处理的链表节点与key是否为同一个对象
+                //如果是,说明用户的目的是替换value,而不是插入
+                if (e.hash == hash &&
+                    ((k = e.key) == key || (key != null && key.equals(k))))
+                    break;
+                p = e;
             }
         }
-        ++modCount;
-        if (++size > threshold)
-            resize();
-        afterNodeInsertion(evict);
-        return null;
+        //如果用户目的是替换元素,那么额e就是找出来的对象,否则如果是插入新节点e就会为null
+        if (e != null) { // existing mapping for key
+            V oldValue = e.value;
+            //onlyIfAbsent为false允许替换元素,如果不允许替换元素,那么就看看原始value是否为null
+            //如果为null,那么即使onlyAbsence为true也能替换
+            if (!onlyIfAbsent || oldValue == null)
+                e.value = value;
+            afterNodeAccess(e);//@second question
+            return oldValue;
+        }
     }
+    ++modCount;
+    //如果插入后元素个数超出了存储阈值,那么就会调用resize扩容
+    if (++size > threshold)
+        resize();
+    afterNodeInsertion(evict);
+    return null;
+}
+
+```
+
+不难理解的代码都写在注释中了,这里写写比较难以理解的地方。
+
+@First Question:为什么要这么写?
+
+首先,`if (p.hash == hash && ((k = p.key) == key || (key != null && key.equals(k))))`这一句是在判断插入的key与bucket中的第一个key是否为同一个对象,在HashMap中判断两个对象是否为同一个需要hash相同并且对象相同。所以用`&&`把hash是否相同与对象是否相同的两个条件连接起来没什么问题。并且判断hash比后面的判断要快,所以把判断hash写在前面。但是判断两个对象是否相同为什么要使用`(key != null && key.equals(k)))`?
+
+因为如果两个对象地址都相同,那么肯定是同一个对象。后面的条件是为了满足有些重写了`equals`与`hashCode`方法的类需要把逻辑上相同的两个对象认为是同一个对象。
+
+@Second Question:`afterNodeAccess`有什么用?
+
+追踪其实现代码,发现其其实是空函数:
+``` java
+// Callbacks to allow LinkedHashMap post-actions
+    void afterNodeAccess(Node<K,V> p) { }
+    void afterNodeInsertion(boolean evict) { }
+    void afterNodeRemoval(Node<K,V> p) { }
+```
+
+注释里写的是给`LinkedHashMap`用作回调函数,不知道为什么HashMap里也使用这个,我们可以override这些函数,在完成插入、替换或者移除节点这些动作后执行一些通用的操作。
+
+#### treeifyBin
+
+`putVal`中还有一个非常重要的方法,就是`treeifyBin`,该方法将链表转化为一颗RB tree,实现代码如下:
+
+``` java
+/**
+    * Replaces all linked nodes in bin at index for given hash unless
+    * table is too small, in which case resizes instead.
+    */
+final void treeifyBin(Node<K,V>[] tab, int hash) {
+    int n, index; Node<K,V> e;
+    if (tab == null || (n = tab.length) < MIN_TREEIFY_CAPACITY)
+        resize();
+    else if ((e = tab[index = (n - 1) & hash]) != null) {
+        TreeNode<K,V> hd = null, tl = null;
+        do {
+            TreeNode<K,V> p = replacementTreeNode(e, null);
+            if (tl == null)
+                hd = p;
+            else {
+                p.prev = tl;
+                tl.next = p;
+            }
+            tl = p;
+        } while ((e = e.next) != null);
+        if ((tab[index] = hd) != null)
+            hd.treeify(tab);
+    }
+
+    // For treeifyBin
+    TreeNode<K,V> replacementTreeNode(Node<K,V> p, Node<K,V> next) {
+        return new TreeNode<>(p.hash, p.key, p.value, next);
+    }
+}
+```
+
+可以看出,`treeifyBin`仅仅是将目标bucket的由`Node`组成的双向链表转化为由`TreeNode`组成的双向链表,具体的树化还得看双向链表的头节点`hd`的方法`treeify`。
+
+#### TreeNode
+
+在深入了解`treeify`之前,我们还需要简单了解一下`TreeNode`的结构。`TreeNode`继承于`LinkedHashMap.Entry`,而`LinkedHashMap.Entry`又继承于`HashMap.Node`,最后`HashMap.Node`继承于`Map.Entry`。这一串继承下来,`TreeNode`的变量总共有11个。
+
+``` java
+ static final class TreeNode<K,V> extends LinkedHashMap.Entry<K,V> {
+    TreeNode<K,V> parent;  // red-black tree links
+    TreeNode<K,V> left;
+    TreeNode<K,V> right;
+    TreeNode<K,V> prev;    // needed to unlink next upon deletion
+    boolean red;
+    TreeNode(int hash, K key, V val, Node<K,V> next) {
+        super(hash, key, val, next);
+    }
+    ...
+}
+
+static class Entry<K,V> extends HashMap.Node<K,V> {
+    Entry<K,V> before, after;
+    Entry(int hash, K key, V value, Node<K,V> next) {
+        super(hash, key, value, next);
+    }
+}
+
+static class Node<K,V> implements Map.Entry<K,V> {
+    final int hash;
+    final K key;
+    V value;
+    Node<K,V> next;
+    ...
+}
+```
+下面是`TreeNode`的`treeify`方法。
+
+``` java
+/**
+* Forms tree of the nodes linked from this node.
+*/
+
+final void treeify(Node<K,V>[] tab) {
+    TreeNode<K,V> root = null;
+    for (TreeNode<K,V> x = this, next; x != null; x = next) {
+        //x.next的运行时类型为TreeNode,但是静态类型为Node,所以需要强制转换
+        next = (TreeNode<K,V>)x.next;
+        x.left = x.right = null;
+        //还没有设置RB树的根节点,设置一哈
+        if (root == null) {
+            x.parent = null;
+            //根节点必为黑
+            x.red = false;
+            root = x;
+        }
+        else {
+            K k = x.key;
+            int h = x.hash;
+            Class<?> kc = null;
+            for (TreeNode<K,V> p = root;;) {
+                int dir, ph;
+                K pk = p.key;
+                if ((ph = p.hash) > h)
+                    dir = -1;
+                else if (ph < h)
+                    dir = 1;
+                else if ((kc == null &&
+                            (kc = comparableClassFor(k)) == null) ||
+                            (dir = compareComparables(kc, k, pk)) == 0)
+                    dir = tieBreakOrder(k, pk);
+
+                TreeNode<K,V> xp = p;
+                if ((p = (dir <= 0) ? p.left : p.right) == null) {
+                    x.parent = xp;
+                    if (dir <= 0)
+                        xp.left = x;
+                    else
+                        xp.right = x;
+                    root = balanceInsertion(root, x);
+                    break;
+                }
+            }
+        }
+    }
+    moveRootToFront(tab, root);
+}
 
 ```
 
