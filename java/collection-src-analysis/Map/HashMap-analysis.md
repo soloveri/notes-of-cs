@@ -843,29 +843,36 @@ final void treeify(Node<K,V>[] tab) {
             x.red = false;
             root = x;
         }
+        //开始放置新的树节点
         else {
+            //x就是当前要放入的节点
             K k = x.key;
             int h = x.hash;
             Class<?> kc = null;
             for (TreeNode<K,V> p = root;;) {
                 int dir, ph;
                 K pk = p.key;
+                //@First-Q
+                //为什么要比较hash的大小
                 if ((ph = p.hash) > h)
                     dir = -1;
                 else if (ph < h)
                     dir = 1;
+                //hash相等
                 else if ((kc == null &&
                             (kc = comparableClassFor(k)) == null) ||
                             (dir = compareComparables(kc, k, pk)) == 0)
                     dir = tieBreakOrder(k, pk);
 
                 TreeNode<K,V> xp = p;
+                //dir<=0就插入到左子树中,否则插入到右子树中
                 if ((p = (dir <= 0) ? p.left : p.right) == null) {
                     x.parent = xp;
                     if (dir <= 0)
                         xp.left = x;
                     else
                         xp.right = x;
+                    //平衡颜色
                     root = balanceInsertion(root, x);
                     break;
                 }
@@ -876,7 +883,7 @@ final void treeify(Node<K,V>[] tab) {
 }
 
 ```
-
+[为什么HashMap的get方法没有写成泛型？](https://stackoverflow.com/questions/857420/what-are-the-reasons-why-map-getobject-key-is-not-fully-generic)
 
 ## 0x3 与JDK1.7的HashMap异同
 
@@ -891,3 +898,4 @@ https://albenw.github.io/posts/df45eaf1/
 2. [关于HashMap的一些理解](https://albenw.github.io/posts/df45eaf1/)
 3. [HashMap defaultLoadFactor = 0.75和泊松分布没有关系](https://blog.csdn.net/reliveIT/article/details/82960063?utm_medium=distribute.pc_relevant.none-task-blog-BlogCommendFromMachineLearnPai2-4.channel_param&depth_1-utm_source=distribute.pc_relevant.none-task-blog-BlogCommendFromMachineLearnPai2-4.channel_param)
 4. [HashMap面试必问的6个点，你知道几个](https://juejin.im/post/5d5d25e9f265da03f66dc517)
+5. 

@@ -28,6 +28,13 @@ categories: 反射
 注意:
 > 使用泛型构造方法并不要求类是泛型类
 
+更新(2020-08-14 20:18:36):
+
+还有一些概念,了解后可以更好的帮助我们了解泛型:
+
+- 泛型类型(generic type):是一个带着类型参数的类型,即类似于`class Person<T>`
+- 参数化类型(parameterized type):即使用具体的类型实参去实例化泛型类型的类型,例如使用类型`String`去实例化泛型类型`class Person<T>`,所得的参数类型为`class Person<String>`
+
 ### 1.1 泛型使用的简单示例
 
 **泛型类与泛型接口:**
@@ -259,7 +266,7 @@ class D<T>{}
 A ref;
 E ref;
 //It is a parameterized type in which all type arguments are **unbounded** wildcards
-//是一个参数化类型,但是所有的类型参数都是无界限定符
+//是一个参数化类型,但是所有的类型参数都是无界通配符
 B<?> ref;
 //raw type
 List ref;
@@ -369,7 +376,7 @@ public class CovariantTest {
 
 上面调用`feed`的代码是无法通过编译的,因为`feed`接受的是`List<Animal>`,而提供的是`ArrayList<Dog>`,这是因为泛型不支持协变。那么这个需求是确确实实存在的,怎么办?
 
-这时候泛型通配符`?`该上场了,为了限制泛型的类型,泛型的通配符是可以加边界的,通配符`?`边界分为以下三种:
+这时候泛型通配符`?`该上场了,泛型的作用是限制泛型的类型,提供类似协变的功能。通配符是可以加边界的,通配符`?`边界分为以下三种:
 
 - 有上界的通配符:例如`? super Animal`,意思是这个泛型只能是`Animal`或者`Animal`的父类
 - 有下界的通配符:例如`? extends Animal`,意思是这个泛型只能是`Animal`或者`Animal`的子类
@@ -440,3 +447,18 @@ public static <T> void copy(List<? super T> dest, List<? extends T> src) {
 泛型的继承
 
 泛型的擦除
+
+
+## 关于泛型的常见问题
+
+这里罗列一些关于泛型的一些常见问题,后续会持续更新。
+
+### 为什么不能用在定义泛型类时不能使用通配符?
+
+因为?是用来填充类型参数的,注意,是填充,不能用来定义类型参数
+https://blog.csdn.net/qq_27093465/article/details/73249434
+
+### 有哪些类型不能定义泛型?
+
+### 使用通配符是经常见到的capture到底什么意思?
+
