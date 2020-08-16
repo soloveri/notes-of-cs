@@ -202,6 +202,7 @@ class People<T>{
 答案来源于:[java中，数组为什么要设计为协变？](https://www.zhihu.com/question/21394322),我在这里补充一些我的理解。
 
 在java1.5之前,java是不支持泛型的,因为没时间做。但是又需要泛型的特性,所以就把数组设计成协变的了。例如在比较数组时调用的是`Arrays.equals`方法,其底层调用的是`Object.equals`方法。
+
 ``` java
 public static boolean equals(Object[] a, Object[] a2) {
         if (a==a2)
