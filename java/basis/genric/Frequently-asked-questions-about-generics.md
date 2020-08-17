@@ -241,7 +241,121 @@ MyList<?> myList;//
 
 ## 5. 有没有不能使用泛型的地方?
 
+几乎所有类型都可以拥有类型参数,但除了一下几种类型:
 
-## 6.
+- 枚举类型:因为枚举类型不能有类型参数,所以枚举类中的值都是静态类型的,但是又因为类型参数不能用于任何静态的上下文环境,所以在枚举类中使用泛型是没有任何意义的
+- 匿名内部类:它可以继承一个参数化类型的类或者接口,但它本身不能是，因为**匿名内部泛型类没有任何意义**。因为匿名内部类没有名字,所以在声明时就没有地方提供类型参数
+- 异常类:一个泛型类不能间接或者直接继承自`Throwable`接口,因为异常处理机制是一种运行时机制,但是在运行时泛型已经被擦出了。所以对于同一个泛型类型但是类型参数不同的两个参数化类型来说,虚拟机并不能区分它们,所以异常泛型类也是无意义的。
+
+
+## 6.能不能强转成参数化类型?
+
+可以,但是这种操作是类型不安全的,且会产生"unchecked"的编译警告。
+
+因为一个变量的类型分为静态类型与动态类型。一个类型转换操作也分为两个部分:
+
+- 编译时期的静态类型检查
+- 运行十七的动态类型检查
+
+静态时期的类型检查去除了一些显而易见的错误,例如讲`String`转换成`Date`。而动态类型检查使用了动态类型进行检查。如果动态类型不是目标类型或者不是目标类型的子类(也就是所谓的向下转型),那么就会产生`ClassCastException`。
+
+但是并不是所有类型转换都会动态类型检查。基本类型之间的转换仅会进行静态类型检查。并且向上转型也只会进行静态类型检查,向上转型不写也没关系,因为编译器会帮你做这件事。
+
+**需要动态检查**的类型转换潜在是类型不安全的,尤其是当目标类型为一个参数化类型。在运行时参数化类型的类型信息不在存在,虚拟机不能区分两个是同一个泛型,但是采用不同的类型参数实例化出的参数化类型,所以在这种情况下,本不该通过动态检查的类型转换却通过了,这不是我们希望看到的。例如下面的代码,将`Object`转换为`List<String>`,但是却没有抛出`ClassCastException`.
+
+``` java
+void m1() {
+  List<Date> list = new ArrayList<Date>();
+  ...
+  m2(list);
+}
+void m2(Object arg) {
+  ...
+  List<String> list = (List<String>) arg;    // unchecked warning
+  ...
+  m3(list);
+  ...
+}
+void m3(List<String> list) {
+  ...
+  String s = list.get(0);      // ClassCastException
+  ...
+}
+```
+注意上面抛出异常的位置,不是在我们进行类型转换的位置,而是在我们提取元素的时候。这种没有在正确地方抛出的异常是我们非常不愿意看到的。所以为了引起我们对这种潜在的类型不安全的转换注意,编译器产生了"unchecked"警告在遇到可疑的转换时。
+
+所以,**编译器在每一处目标类型是参数化类型并且是向下转型的地方,都会产生一个unchecked警告**。
+
+
+## 7.泛型中哪里会出现的"unchecked"警告?
+
+1. 首先就是上面一个问题所说的:向下转型为参数化类型的地方。
+
+2. 如果方法的参数类型没有因为类型擦除而改变,那么调用这个方法就是类型安全的
+
+3. 如果字段的类型因为类型擦除而改变,那么对该字段赋值就会产生"unchecked",但是读取该字段的值却不会产生任何问题
+
+
+## 8. unbound wildcard parameterized type和raw type有什么区别?
+
+其实这二者没有太大区别,二者都可以被视作是任何参数化类型的超级类,并且二者都是`reifiable types`。所以这两种类型可以作为数组的元素类型(注意是unbound wildcard而不是wildcard)。但是编译器对`unbound wildcard parameterized type`更严格。对于同样的操作,如果`raw type`产生了`unchecked`警告,那么`unbound wildcard parameterized type`则会产生编译错误。
+
+
+## 9. 泛型真的不能使用instance of吗?
+
+大部分都不行,只有无界通配符可以,因为只有`reifiable type`能够使用`instance of`,`reifiable types`包括且只包括:
+
+- It refers to a non-generic class or interface type declaration.
+
+- It is a parameterized type in which all type arguments are **unbounded** wildcards (§4.5.1).
+
+- It is a raw type (§4.8).
+
+- It is a primitive type (§4.2).
+
+- It is an array type (§10.1) whose element type is reifiable.
+
+- It is a nested type where, for each type T separated by a ".", T itself is reifiable.
+
+## 10. 能创建具体参数化类型的数组吗?
+
+所谓的具体参数化类型就是类型参数是一个具体的参数,例如`String`、`Integer`等等。对于这个问题的答案是不能,因为是类型不安全的。
+
+因为插入操作会逃过数组的动态类型检查。
+
+## 11. 能创建通配符参数化类型的数组吗?
+
+无界通配符可以,有界通配符不行。
+
+``` java
+
+//非法操作
+Object[] numPairArr = new Pair<? extends Number,? extends Number>[10]; // illegal
+numPairArr[0] = new Pair<Long,Long>(0L,0L);     // fine
+//注意,下面这句逃过了数组的动态类型检查
+numPairArr[0] = new Pair<String,String>("",""); // should fail, but would succeed
+
+//合法操作
+Object[] pairArr = new Pair<?,?>[10] ;        // fine
+pairArr[0] = new Pair <Long,Long>(0L,0L);     // fine
+pairArr[0] = new Pair <String,String>("",""); // fine 
+pairArr[0] = new ArrayList <String>();        // fails with ArrayStoreException
+```
+
+## 12. 能创建元素类型是通配符参数化类型的数组吗?
+
+可以,但没必要。
+
+``` java
+Pair<? extends Number,? extends Number>[] arr = new Point[2];
+arr[0] = new Point(-1.0,1.0);  // fine
+//虽然能通过静态类型检查,但是无法通过数组的动态类型检查
+arr[1] = new Pair<Number,Number>(-1.0,1.0); // fine (causes ArrayStoreException)
+arr[2] = new Pair<Integer,Integer>(1,2); // fine (causes ArrayStoreException)
+```
+
+## 13.通配符参数化类型不能干嘛?
+
+不能做父类。
 
 
