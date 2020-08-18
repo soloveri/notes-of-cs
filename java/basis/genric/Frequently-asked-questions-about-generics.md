@@ -12,7 +12,11 @@ categories: 基础
 
 这里罗列一些关于泛型的常见问题,并给出解答。其中本篇大多数问题来自[Java Generics FAQs - Generic And Parameterized Types](http://www.angelikalanger.com/GenericsFAQ/FAQSections/ParameterizedTypes.html),我这里仅翻译一些我认为比较容易糊涂的问题。
 
-当然,在解答这些问题时,我们需要牢记一个概念,通配符`?`表示的是不知道是什么类型,而不是任意类型。  
+当然,在解答这些问题时,我们需要牢记一个概念,通配符`?`表示的是不知道是什么类型,而不是任意类型。
+
+- 泛型类型:`class test<T>{}`
+- 具体参数类型:`class test<String> t1=null;`
+- 泛型参数类型:`test<?> t2=null;`
 
 ## 1. 使用通配符时经常出现的capture#XXX of ? 到底什么意思?
 
@@ -243,7 +247,7 @@ MyList<?> myList;//
 
 几乎所有类型都可以拥有类型参数,但除了一下几种类型:
 
-- 枚举类型:因为枚举类型不能有类型参数,所以枚举类中的值都是静态类型的,但是又因为类型参数不能用于任何静态的上下文环境,所以在枚举类中使用泛型是没有任何意义的
+- 枚举类型:因为枚举类型不能有类型参数,所以枚举类中的值都是静态类型的,但是又因为**类型参数不能用于任何静态的上下文环境**,所以在枚举类中使用泛型是没有任何意义的
 - 匿名内部类:它可以继承一个参数化类型的类或者接口,但它本身不能是，因为**匿名内部泛型类没有任何意义**。因为匿名内部类没有名字,所以在声明时就没有地方提供类型参数
 - 异常类:一个泛型类不能间接或者直接继承自`Throwable`接口,因为异常处理机制是一种运行时机制,但是在运行时泛型已经被擦出了。所以对于同一个泛型类型但是类型参数不同的两个参数化类型来说,虚拟机并不能区分它们,所以异常泛型类也是无意义的。
 
@@ -317,15 +321,31 @@ void m3(List<String> list) {
 
 - It is a nested type where, for each type T separated by a ".", T itself is reifiable.
 
-## 10. 能创建具体参数化类型的数组吗?
+## 10. 能创建数组元素是具体参数化类型的数组吗?
 
 所谓的具体参数化类型就是类型参数是一个具体的参数,例如`String`、`Integer`等等。对于这个问题的答案是不能,因为是类型不安全的。
 
-因为插入操作会逃过数组的动态类型检查。
+因为插入操作会逃过数组的动态类型检查,见如下代码:
 
-## 11. 能创建通配符参数化类型的数组吗?
+``` java
+static void test() {
+  Pair<Integer,Integer>[] intPairArr = new Pair<Integer,Integer>[10] ; // error
+  addElements(intPairArr); 
+  Pair<Integer,Integer> pair = intPairArr[1];
+  Integer i = pair.getFirst();
+  pair.setSecond(i);
+}
+static void addElements( Object[] objArr) {
+  objArr[0] = new Pair<Integer,Integer>(0,0);
+  objArr[1] = new Pair<String,String>("","");      // should fail with ArrayStoreException,但是因为在运行时泛型已经不存在了
+                                                  //  逃过了数组插入时的类型动态检查
+}
 
-无界通配符可以,有界通配符不行。
+```
+
+## 11. 能创建数组元素类型是通配符参数化类型的数组吗?
+
+无界通配符可以,有界通配符不行。因为有界通配符的插入操作也可以逃过数组插入时的动态类型检查,而无界通配符不会。
 
 ``` java
 
@@ -342,11 +362,16 @@ pairArr[0] = new Pair <String,String>("",""); // fine
 pairArr[0] = new ArrayList <String>();        // fails with ArrayStoreException
 ```
 
-## 12. 能创建元素类型是通配符参数化类型的数组吗?
+## 12. 能创建数组元素是有界通配符参数化类型的数组引用吗?
 
 可以,但没必要。
 
 ``` java
+//创建了数组元素类型是有界通配符类型的数组
+
+Pair<? extends Number,? extends Number>[] arr = null;
+
+class Point extends Pair<Double,Double> { ... }
 Pair<? extends Number,? extends Number>[] arr = new Point[2];
 arr[0] = new Point(-1.0,1.0);  // fine
 //虽然能通过静态类型检查,但是无法通过数组的动态类型检查
@@ -356,6 +381,34 @@ arr[2] = new Pair<Integer,Integer>(1,2); // fine (causes ArrayStoreException)
 
 ## 13.通配符参数化类型不能干嘛?
 
-不能做父类。
+不能做父类。见如下代码:
+
+``` java
+class MyClass implements Comparable <?> { // error
+  public int compareTo( ??? arg) { ... }
+}
+```
+编译器无法知道`comapreTo`方法到底接受的是什么类型的参数,很奇怪。而且,如前面所说,因为有`capture conversion`操作,这样的定义是没有任何意义的。
+
+
+## 15. 具体化参数类型不能做什么?
+
+具体化参数类型(concrete parameterized type)就是使用具体类型实例化泛型类型的类型。那么它不能做:
+
+1. 使用`instance of`
+2. 不能创建数组
+3. 不能用于异常处理(泛型都不行)
+
+
+## 14. 泛型不能做什么?
+
+1. 不能有静态泛型字段:**因为type parameter不适用于静态上下文环境**,所以泛型不能适用于静态泛型字段,例如`static T member`
+2. 不用如此使用：` obj instanceof T`,因为类型擦除的原因
+
+
+
+**参考文献:**
+
+若非特殊标注,[问题引自](http://www.angelikalanger.com/GenericsFAQ/FAQSections/ParameterizedTypes.html#FAQ001)
 
 
