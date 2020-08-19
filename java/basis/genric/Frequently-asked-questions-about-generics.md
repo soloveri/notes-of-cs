@@ -402,13 +402,13 @@ class MyClass implements Comparable <?> { // error
 
 ## 14. 泛型不能做什么?
 
-1. 不能有静态泛型字段:**因为type parameter不适用于静态上下文环境**,所以泛型不能适用于静态泛型字段,例如`static T member`
+1. 不能在静态字段中使用类型参数(type paramemter):**因为type parameter不适用于静态上下文环境**,所以泛型不能适用于静态泛型字段,例如`static T member`、`static List<T> list`
 2. 不用如此使用：` obj instanceof T`,因为类型擦除的原因
 
 
 
 **参考文献:**
 
-若非特殊标注,[问题引自](http://www.angelikalanger.com/GenericsFAQ/FAQSections/ParameterizedTypes.html#FAQ001)
+若非特殊标注,问题引自[Java Generics FAQs - Generic And Parameterized Types](http://www.angelikalanger.com/GenericsFAQ/FAQSections/ParameterizedTypes.html#FAQ001)
 
 
