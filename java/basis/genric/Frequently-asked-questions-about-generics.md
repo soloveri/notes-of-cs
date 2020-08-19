@@ -410,5 +410,3 @@ class MyClass implements Comparable <?> { // error
 **参考文献:**
 
 若非特殊标注,问题引自[Java Generics FAQs - Generic And Parameterized Types](http://www.angelikalanger.com/GenericsFAQ/FAQSections/ParameterizedTypes.html#FAQ001)
-
-

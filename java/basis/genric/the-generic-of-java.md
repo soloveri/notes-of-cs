@@ -446,26 +446,279 @@ public static <T> void copy(List<? super T> dest, List<? extends T> src) {
 
 ### 3. 泛型的擦除
 
-在最开始曾说到java的泛型是**伪泛型**,仅仅保持在编译层面。在生成字节码文件时会对泛型擦除,将参数类型(parameterized types)转为原始类型(raw types)。所谓的参数类型就是类似于`class Animal<T>`这种,而将它转换为原始类型就是`class Animal`。以下面的代码做一个简单的示范。
-泛型下的多态
+在最开始曾说到java的泛型是**伪泛型**,仅仅保持在编译层面。在生成字节码文件时会对泛型擦除,将参数类型(parameterized types)转为原始类型(raw types)。所谓的参数类型就是类似于`class Person<T>`这种,而将它转换为原始类型就是`class Pseron`。在这种机制下,java中的多态就比较奇妙了。
 
-桥接
+#### 3.1 泛型下的多态
 
-泛型的继承
+``` java
+package generic;
+//定义泛型类Person
+public class Person<T> {
+    T name;
+    public T getName(){
+        return name;
+    };
 
-泛型的擦除
+    public void setName(T name) {
+        this.name = name;
+    }
+
+    public static void main(String[] args) {
+        Student s=new Student();
+    }
+}
+//Student类继承Person
+class Student extends Person<String>{
+    String stuName;
+    @Override
+    public String getName(){
+        return stuName;
+    }
+
+    @Override
+    public void setName(String name){
+        this.stuName=name;
+    }
+}
+```
+
+`Student`类继承了`Pseron`类,并且指定了父类的类型实参为`String`。那么父类的定义应该如下所示:
+
+``` java
+public class Person {
+    String name;
+    public String getName(){
+        return name;
+    };
+
+    public void setName(String name) {
+        this.name = name;
+    }
+}
+```
+
+然而java中的泛型都是假泛型,泛型在编译期被擦除后,因为类型变量`T`没有上界,所以编译会把T推断为`Object`类型。所以真正的代码如下所示:
+
+``` java
+public class Person {
+    Object name;
+    public Object getName(){
+        return name;
+    };
+
+    public void setName(Object name) {
+        this.name = name;
+    }
+}
+```
+所以按道理,`Student`类中的`String`类型也应该变成`Object`类型,这样一来,不是全乱套了?所以java为了解决这个问题,发明了一种桥方法的机制。
+
+可以看到,`Student`类中的`getName`和`setName`和`Person`类中的`getName`和`setName`参数类型根本就不一样,所以这根本就不是重载。但是代码又可以编译通过并且实现多态的特性。奇怪的事情发生了。我们看看`Studnet`编译后的字节码:
+``` java
+// access flags 0x1
+  public getName()Ljava/lang/String;
+   L0
+    LINENUMBER 22 L0
+    ALOAD 0
+    GETFIELD generic/Student.stuName : Ljava/lang/String;
+    ARETURN
+   L1
+    LOCALVARIABLE this Lgeneric/Student; L0 L1 0
+    MAXSTACK = 1
+    MAXLOCALS = 1
+
+  // access flags 0x1
+  public setName(Ljava/lang/String;)V
+   L0
+    LINENUMBER 27 L0
+    ALOAD 0
+    ALOAD 1
+    PUTFIELD generic/Student.stuName : Ljava/lang/String;
+   L1
+    LINENUMBER 28 L1
+    RETURN
+   L2
+    LOCALVARIABLE this Lgeneric/Student; L0 L2 0
+    LOCALVARIABLE name Ljava/lang/String; L0 L2 1
+    MAXSTACK = 2
+    MAXLOCALS = 2
+
+  // access flags 0x1041
+  public synthetic bridge setName(Ljava/lang/Object;)V
+   L0
+    LINENUMBER 18 L0
+    ALOAD 0
+    ALOAD 1
+    CHECKCAST java/lang/String
+    INVOKEVIRTUAL generic/Student.setName (Ljava/lang/String;)V
+    RETURN
+   L1
+    LOCALVARIABLE this Lgeneric/Student; L0 L1 0
+    MAXSTACK = 2
+    MAXLOCALS = 2
+
+  // access flags 0x1041
+  public synthetic bridge getName()Ljava/lang/Object;
+   L0
+    LINENUMBER 18 L0
+    ALOAD 0
+    INVOKEVIRTUAL generic/Student.getName ()Ljava/lang/String;
+    ARETURN
+   L1
+    LOCALVARIABLE this Lgeneric/Student; L0 L1 0
+    MAXSTACK = 1
+    MAXLOCALS = 1
+```
+
+有两个`setName`,两个`getName`可以看到其中有一组`setName`和`getName`前面有修饰符`synthetic`和`bridge`。`synthetic`表示这是系统自动生成的,而`bridge`表示这是一个桥方法。
+
+所以其实桥方法才真正是`override`了`Person`类中的两个方法。而桥方法又去调用了我们自定义的`setName`与`getName`完成了多态。
 
 
-## 关于泛型的常见问题
 
-这里罗列一些关于泛型的一些常见问题,后续会持续更新。
+#### 3.2 泛型下的继承
 
-### 为什么不能用在定义泛型类时不能使用通配符?
+普通的继承关系并没有类型的困扰。但是一旦给类上了泛型,那么就有点复杂了。大体分为四种情况:
 
-因为?是用来填充类型参数的,注意,是填充,不能用来定义类型参数
-https://blog.csdn.net/qq_27093465/article/details/73249434
+1. 子类直接指定了父类的类型参数
+2. 子类继承了父类的类型参数
+3. 父类擦除了类型参数,子类没有擦除
+4. 子类与父类都擦出了类型参数
 
-### 有哪些类型不能定义泛型?
+下面我们一一解释以下,还是以上面的`Person`类作为例子:
 
-### 使用通配符是经常见到的capture到底什么意思?
+**子类直接制定了父类的类型参数**:
 
+``` java
+public class Person<E> {
+    E name;
+    public E getName(){
+        return name;
+    };
+
+    public void setName(E name) {
+        this.name = name;
+    }
+}
+
+class Student extends Person<String>{
+    String stuName;
+    @Override
+    public String getName(){
+        return stuName;
+    }
+
+    @Override
+    public void setName(String name){
+        this.stuName=name;
+    }
+}
+```
+
+在这种情况,父类的类型参数已经被制定了,所以子类中从父类继承而来的东西也是被指定的类型,例如`String`。如果子类新加了类型参数`T`,那么这个`T`和父类没有任何关系。
+
+``` java
+class Student<T> extends Person<String>{
+    T age;
+    String stuName;
+    @Override
+    public String getName(){
+        return stuName;
+    }
+
+    @Override
+    public void setName(String name){
+        this.stuName=name;
+    }
+
+    public void setAge(T age){
+        ...
+    }
+}
+```
+
+**子类继承了父类的类型参数**:
+
+``` java
+class Student<T,E> extends Person<E>{
+    T age;
+    String stuName;
+    @Override
+    public E getName(){
+        return stuName;
+    }
+
+    @Override
+    public void setName(E name){
+        this.stuName=name;
+    }
+
+    public void setAge(T age){
+        ...
+    }
+}
+```
+那么在子类中从父类继承而来的东西,类型还是`E`,类型参数`T`与父类没有任何关系。
+
+**父类进行了泛型擦除而子类没有:**
+``` java
+class Student<T> extends Person{
+    T age;
+    String stuName;
+    @Override
+    public Object getName(){
+        return stuName;
+    }
+
+    @Override
+    public void setName(Object name){
+        this.stuName=name;
+    }
+
+    public void setAge(T age){
+        ...
+    }
+}
+```
+
+在这个例子中,由于`Person`类中的类型参数`E`没有上限,因为编译器只能把`E`推断为Object最为安全。如果类型参数`E`有上限,例如`E extends Number`,那么编译器就会将`E`推断为`Number`。上面代码中的`Object`就会全部换成`Number`了。
+
+**子类与父类都进行了泛型擦除:**
+
+``` java
+class Student extends Person{
+     age;
+    String stuName;
+    @Override
+    public E getName(){
+        return stuName;
+    }
+
+    @Override
+    public void setName(E name){
+        this.stuName=name;
+    }
+
+    public void setAge(T age){
+        ...
+    }
+}
+```
+子类与父类都进行了擦除这么说并不准确,因为根本就没有定义子类的类型参数...规则和父类擦除而子类不擦除的规则一样。要看父类的类型参数有没有上限,因为编译器的推断类型是不一样的。
+
+**那么为什么不能父类不擦除,而子类不擦除呢？**
+
+因为继承泛型类时,子类必须对父类中的类型参数进行初始化,当然父类擦除或者由子类指定都可以。所以子类擦除而父类不擦除,父类中的类型参数由谁来初始化?
+
+## 参考文献
+
+
+1. [仔细说说Java中的泛型](https://zhuanlan.zhihu.com/p/31137677)
+
+2. [Java泛型类型擦除以及类型擦除带来的问题](https://www.cnblogs.com/wuqinglong/p/9456193.html)
+
+3. [java泛型学习（2）](https://developer.aliyun.com/article/313280)
+
+4. [java 如何继承泛型](https://segmentfault.com/q/1010000007925818)
+
+5. [泛型继承的几种写法](https://blog.csdn.net/ShierJun/article/details/51253870)
