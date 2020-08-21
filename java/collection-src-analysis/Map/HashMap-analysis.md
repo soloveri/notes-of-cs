@@ -30,9 +30,9 @@ Map提供了三种方法来遍历自身:
 - 通过`values()`返回Map中values组成的Collection
 - 通过`entrySet()`返回由`Map.Entry`组成的Set
 
-前两种都比较常规。值得一提的是第三种方式中的`Map.Entry`。在`Map`接口定义了一个内部接口`Entry`。Entry维护了一组键值对,类似于c++HashMap中的pair结构。这个Entry结构只能通过Map的迭代器获得。并且这些Entry集合**只**在遍历的过程中有效,如果在遍历过程中修改了集合,那么Entry的操作是未定义,除了使用Entry定义的`setValue()`方法。
+前两种都比较常规。值得一提的是第三种方式中的`Map.Entry`。在`Map`接口定义了一个内部接口`Entry`。Entry维护了一组键值对,类似于c++HashMap中的pair结构。这个Entry结构只能通过Map的迭代器获得。并且这些Entry集合**只**在遍历的过程中有效,如果在遍历过程中修改了集合,那么对Entry的操作是未定义的,除非使用Entry定义的`setValue()`方法。
 
-## 0x0 HashMap中的常量
+## 1. HashMap中的常量
 
 HashMap中定义了一些比较重要的常量,如下所示:
 
@@ -79,7 +79,7 @@ HashMap中定义了一些比较重要的常量,如下所示:
 
 下面将罗列一些常见的关于HashMap常量的问题。
 
-### 0x0-0 为什么Map的容量都是2的整数幂?
+### 1.1 为什么Map的容量都是2的整数幂?
 
 有两个理由:
 
@@ -114,7 +114,7 @@ tab就是用来存储bucket的数组。n是数组的容量。如果n是2的整�
 
 > 值得注意的是,JDK1.8中,HashMap扩容不会讲链表倒置,而JDK1.7会
 
-### 0x0-1 为什么hash要这么计算?
+### 1.2 为什么hash要这么计算?
 
 在JDK1.8中,Map计算hashcode采用了新的方法:
 
@@ -137,7 +137,7 @@ static final int hash(Object key) {
 
 **最后,null的hash为0!**
 
-### 0x0-2 为什么HashMap的默认容量为16?
+### 1.3 为什么HashMap的默认容量为16?
 
 既然HashMap的容量必须是2的整数幂,那么为什么不是2,4,或者16,32。emm,这个问题我在网上看到的回答是:
 
@@ -145,7 +145,7 @@ static final int hash(Object key) {
 
 这个答案还行吧,好像有那么一点道理。
 
-### 0x0-3 为什么桶中节点数到8才采用RB树?
+### 1.4 为什么桶中节点数到8才采用RB树?
 
 答案存在于源码中的开发笔记。这里仅摘抄最重要的部分。
 
@@ -174,7 +174,7 @@ static final int hash(Object key) {
 
 
 
-### 0x0-4 为什么桶中节点数减少为6才采用链表?
+### 1.5 为什么桶中节点数减少为6才采用链表?
 
 在节点数减少到6时才桶中元素采用RB树转为链表,为什么不是5或者7?
 
@@ -184,7 +184,7 @@ static final int hash(Object key) {
 
 因为如果设置为7,那么加一个entry,变为8就要升级红黑树,减一个entry就变为7降级为链表。如果对HashMap频繁的进行增删操作,那么桶的存储方式就得频繁的在红黑树和链表之间转换,这个开销是不可忽视的。所以设为6,有一个缓冲的空间。
 
-### 0x0-5 为什么factor设为0.75?
+### 1.6 为什么factor设为0.75?
 
 在官方注释中,下面的节选部分解释了为什么`load factor`是0.75。
 
@@ -216,7 +216,7 @@ rehash operations.  If the initial capacity is greater than the maximum number o
 1. 也不一定要求每次插入都必须要求空桶吧?
 2. `1/s`的数学意义到底代表着什么?
 
-## 0x1 HashMap的属性
+## 2. HashMap的属性
 
 HashMap中的magic number在上面已经分析过,下面是HashMap的一些属性:
 
@@ -412,7 +412,7 @@ public interface Comparator<T> {
 
 ok,经过上述的简单科普,相信返回比较器的代码实现已经不是问题了。上述所有的点都是java8的新语法,包括在接口中定义`default`方法和`static`方法。
 
-## 0x2 HashMap的构造方法
+## 3. HashMap的构造方法
 
 `HashMap`总共有4个构造方法,除了`HashMap(Map<? extends K, ? extends V> m)`以外,其他3个构造函数都是仅仅设置装载因子`load factor`,在这三个构造函数中,除了默认构造函数,~~另外两个都会设置初始容量~~。
 
@@ -515,11 +515,11 @@ static final int tableSizeFor(int cap) {
 - 如果此时的容量小于`2^31`但是大于`2^30`,那么就将容量修正为`2^30`
 - 否则最新容量就是最近的2的整数幂。
         
-## 0x2 HashMap中的常用方法
+## 4. HashMap中的常用方法
 
 HashMap中最常用的就是`put(key,value)`函数与`remove`函数,而且这些函数还会包含RB树与list的相互转换,比较复杂。值得认真推敲。
 
-### put方法
+### 4.1 put方法
 
 下面JDk1.8中,HashMap的`put`源码。其又在内部调用了`putVal`。
 
@@ -656,7 +656,7 @@ final Node<K,V>[] resize() {
 }
 ```
 
-#### putVal方法
+#### 4.1.1 putVal方法
 
 老规矩,先把代码粘上来:
 
@@ -753,7 +753,7 @@ final V putVal(int hash, K key, V value, boolean onlyIfAbsent,
 
 注释里写的是给`LinkedHashMap`用作回调函数,不知道为什么HashMap里也使用这个,我们可以override这些函数,在完成插入、替换或者移除节点这些动作后执行一些通用的操作。
 
-#### treeifyBin
+#### 4.1.2 treeifyBin
 
 `putVal`中还有一个非常重要的方法,就是`treeifyBin`,该方法将链表转化为一颗RB tree,实现代码如下:
 
@@ -764,20 +764,26 @@ final V putVal(int hash, K key, V value, boolean onlyIfAbsent,
     */
 final void treeifyBin(Node<K,V>[] tab, int hash) {
     int n, index; Node<K,V> e;
+    //如果tab的长度小于64,那么就会扩容,而不是树化
     if (tab == null || (n = tab.length) < MIN_TREEIFY_CAPACITY)
         resize();
     else if ((e = tab[index = (n - 1) & hash]) != null) {
+        //hd是头节点,tl指向尾节点
         TreeNode<K,V> hd = null, tl = null;
         do {
+            //Node节点转换为TreeNode双链表
             TreeNode<K,V> p = replacementTreeNode(e, null);
+            //设置头节点
             if (tl == null)
                 hd = p;
+            //尾插法
             else {
                 p.prev = tl;
                 tl.next = p;
             }
             tl = p;
         } while ((e = e.next) != null);
+        //因为TreeNode是Node的子列,所以将tab[index]替换成RB树的头节点
         if ((tab[index] = hd) != null)
             hd.treeify(tab);
     }
@@ -791,7 +797,7 @@ final void treeifyBin(Node<K,V>[] tab, int hash) {
 
 可以看出,`treeifyBin`仅仅是将目标bucket的由`Node`组成的双向链表转化为由`TreeNode`组成的双向链表,具体的树化还得看双向链表的头节点`hd`的方法`treeify`。
 
-#### TreeNode
+#### 4.1.3 TreeNode
 
 在深入了解`treeify`之前,我们还需要简单了解一下`TreeNode`的结构。`TreeNode`继承于`LinkedHashMap.Entry`,而`LinkedHashMap.Entry`又继承于`HashMap.Node`,最后`HashMap.Node`继承于`Map.Entry`。这一串继承下来,`TreeNode`的变量总共有11个。
 
@@ -823,7 +829,7 @@ static class Node<K,V> implements Map.Entry<K,V> {
     ...
 }
 ```
-下面是`TreeNode`的`treeify`方法。
+下面是`TreeNode`的`treeify`方法,该方法就是将一个双向链表转化为红黑树,树化肯定要从根节点开始树化嘛。
 
 ``` java
 /**
@@ -859,13 +865,16 @@ final void treeify(Node<K,V>[] tab) {
                 else if (ph < h)
                     dir = 1;
                 //hash相等
-                else if ((kc == null &&
-                            (kc = comparableClassFor(k)) == null) ||
+                //如果没有实现Comparable接口,那没法比了,只能调用tieBreakOrder强行比较
+                else if ((kc == null &&(kc = comparableClassFor(k)) == null) ||
+                            //实现了Comparable接口,但是二者compare的结果还是相等的
                             (dir = compareComparables(kc, k, pk)) == 0)
+                    //强行比较
                     dir = tieBreakOrder(k, pk);
 
                 TreeNode<K,V> xp = p;
-                //dir<=0就插入到左子树中,否则插入到右子树中
+                //dir<=0就插入到左子树中,否则插入到右子树中,并且如果目标方向的子节点为空,才会进行插入
+                //否则继续向下遍历
                 if ((p = (dir <= 0) ? p.left : p.right) == null) {
                     x.parent = xp;
                     if (dir <= 0)
@@ -879,10 +888,123 @@ final void treeify(Node<K,V>[] tab) {
             }
         }
     }
+    //对树进行平衡调整,从根节点开始调整
     moveRootToFront(tab, root);
 }
-
 ```
+
+那么其中`comaprableClassFor`是干嘛的呢?康康它的源码:
+
+``` java
+/**
+    * Returns x's Class if it is of the form "class C implements
+    * Comparable<C>", else null.
+    */
+static Class<?> comparableClassFor(Object x) {
+    if (x instanceof Comparable) {//如果对象x实现了Comparable接口
+        Class<?> c; Type[] ts, as; Type t; ParameterizedType p;
+        if ((c = x.getClass()) == String.class) // bypass checks
+            return c;
+        //ts是一个Type类型的数组
+        //getGenericInterfaces返回的是c直接实现的接口
+        if ((ts = c.getGenericInterfaces()) != null) {
+            for (int i = 0; i < ts.length; ++i) {
+                //如果t是一个参数化类型并且原始类型是Comparable,并且t的泛型类型中参数个数只有1个,并且参数是x.getClass()
+                //那么就返回x的Class对象,否则返回null
+                if (((t = ts[i]) instanceof ParameterizedType) &&
+                    ((p = (ParameterizedType)t).getRawType() ==
+                        Comparable.class) &&
+                    (as = p.getActualTypeArguments()) != null &&
+                    as.length == 1 && as[0] == c) // type arg is c
+                    return c;
+            }
+        }
+    }
+    return null;
+}
+```
+
+该方法其中就是判断类`c`是否实现了接口`Comparable<c>`,如果实现了,就返回`c`的`Class`对象,否则返回null。那么`compareComparables`是干嘛的?顺便康康其源码:
+
+``` java
+/**
+    * Returns k.compareTo(x) if x matches kc (k's screened comparable
+    * class), else 0.
+    */
+@SuppressWarnings({"rawtypes","unchecked"}) // for cast to Comparable
+static int compareComparables(Class<?> kc, Object k, Object x) {
+    return (x == null || x.getClass() != kc ? 0 :
+            ((Comparable)k).compareTo(x));
+}
+```
+
+首先会比较待插入键`y`的`Class`文件`kc`与树中的节点`x`的`Class`文件是否相同,这一句就要求了如果`y`和`x`必须是同一类型,否则即使`y`实现了`Comaprable`接口也不能比较,因为我们不知道`x`是否实现了`Comparable`接口。
+
+如果是同一类型,那么就是`comparaTo`方法比较这两个键的大小。注意这里还是有可能相等的,还是无法决定这两个键谁大谁小。那么当然还有最后一招,就是方法`tieBreakOrder`,这个方法必须抉择处待插入的节点和数中的某个节点到底谁大。那么它怎么比的?还是看源码咯。
+
+``` java
+/**
+* Tie-breaking utility for ordering insertions when equal
+* hashCodes and non-comparable. We don't require a total
+* order, just a consistent insertion rule to maintain
+* equivalence across rebalancings. Tie-breaking further than
+* necessary simplifies testing a bit.
+*/
+static int tieBreakOrder(Object a, Object b) {
+    int d;
+    if (a == null || b == null ||
+        (d = a.getClass().getName().
+            compareTo(b.getClass().getName())) == 0)
+        d = (System.identityHashCode(a) <= System.identityHashCode(b) ?
+                -1 : 1);
+    return d;
+}
+```
+
+首先判断`a`或者`b`的名字谁长,名字短的排在前面。如果名字长度相等,那么计算`a`和`b`的hashCode,hash相等的话,`a`排在前面。那么`identityHashCode`是怎么计算的?
+
+该方法就是返回对象`a`或`b`的默认hashcode,无论`a`或者`b`是否override了`hashCode`方法。`null`的`hashCode`为0。
+
+
+
+经过上述最多三次的抉择,终于能决定待插入节点`x`和树中的节点谁大谁小了。那么抉择出来了,就可以在数中插入节点`x`了吗?当然不行,我们需要在RB树中找到一个合适的叶节点才能插入。下面的代码就是寻找合适的叶节点:
+
+``` java
+for (TreeNode<K,V> p = root;;) {
+    int dir, ph;
+    K pk = p.key;
+    //@First-Q
+    //为什么要比较hash的大小
+    if ((ph = p.hash) > h)
+        dir = -1;
+    else if (ph < h)
+        dir = 1;
+    //hash相等
+    //如果没有实现Comparable接口,那没法比了,只能调用tieBreakOrder强行比较
+    else if ((kc == null &&(kc = comparableClassFor(k)) == null) ||
+                //实现了Comparable接口,但是二者compare的结果还是相等的
+                (dir = compareComparables(kc, k, pk)) == 0)
+        //强行比较
+        dir = tieBreakOrder(k, pk);
+
+    TreeNode<K,V> xp = p;
+    //dir<=0就插入到左子树中,否则插入到右子树中,并且如果目标方向的子节点为空,才会进行插入
+    //否则继续向下遍历寻找合适的位置
+    if ((p = (dir <= 0) ? p.left : p.right) == null) {
+        x.parent = xp;
+        if (dir <= 0)
+            xp.left = x;
+        else
+            xp.right = x;
+        //平衡颜色
+        root = balanceInsertion(root, x);
+        break;
+    }
+}
+```
+
+在插入完成后,需要平衡以下节点之间的颜色。
+
 [为什么HashMap的get方法没有写成泛型？](https://stackoverflow.com/questions/857420/what-are-the-reasons-why-map-getobject-key-is-not-fully-generic)
 
 ## 0x3 与JDK1.7的HashMap异同
