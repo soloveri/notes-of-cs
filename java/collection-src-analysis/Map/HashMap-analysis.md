@@ -686,7 +686,7 @@ final V putVal(int hash, K key, V value, boolean onlyIfAbsent,
         Node<K,V> e; K k;
         //这里总是首先判断目标bucket中第一个元素是否和key是用一个元素,p就是第一个元素
         if (p.hash == hash &&
-            ((k = p.key) == key || (key != null && key.equals(k)))) @Fisrt Question
+            ((k = p.key) == key || (key != null && key.equals(k)))) //@Fisrt Question
             //把bucket中的第一个元素赋值给e
             e = p;
         //如果目标bucket已经使用RB tree存储了,那么就调用TreeNode的putTreeVal方法存入新节点
@@ -698,6 +698,8 @@ final V putVal(int hash, K key, V value, boolean onlyIfAbsent,
             for (int binCount = 0; ; ++binCount) {
                 if ((e = p.next) == null) {
                     //链表已经遍历完了,还是没有找到相同的对象,说明用户的目的是插入新节点
+                    
+                    //注意,Hash冲突的在这里也会执行插入,导致一条链表过长
                     p.next = newNode(hash, key, value, null);
                     //因为是从p.next开始遍历的,所以在插入第七个元素时,进行树化
                     if (binCount >= TREEIFY_THRESHOLD - 1) // -1 for 1st
@@ -739,7 +741,7 @@ final V putVal(int hash, K key, V value, boolean onlyIfAbsent,
 
 首先,`if (p.hash == hash && ((k = p.key) == key || (key != null && key.equals(k))))`这一句是在判断插入的key与bucket中的第一个key是否为同一个对象,在HashMap中判断两个对象是否为同一个需要hash相同并且对象相同。所以用`&&`把hash是否相同与对象是否相同的两个条件连接起来没什么问题。并且判断hash比后面的判断要快,所以把判断hash写在前面。但是判断两个对象是否相同为什么要使用`(key != null && key.equals(k)))`?
 
-因为如果两个对象地址都相同,那么肯定是同一个对象。后面的条件是为了满足有些重写了`equals`与`hashCode`方法的类需要把逻辑上相同的两个对象认为是同一个对象。
+因为对于引用类型,`==`比较的是对象地址。所以如果两个对象地址都相同,那么肯定是同一个对象。后面的条件是为了满足有些重写了`equals`与`hashCode`方法的类需要把逻辑上相同的两个对象认为是同一个对象。
 
 @Second Question:`afterNodeAccess`有什么用?
 
@@ -752,6 +754,9 @@ final V putVal(int hash, K key, V value, boolean onlyIfAbsent,
 ```
 
 注释里写的是给`LinkedHashMap`用作回调函数,不知道为什么HashMap里也使用这个,我们可以override这些函数,在完成插入、替换或者移除节点这些动作后执行一些通用的操作。
+
+>Attention!!!
+能存储在一个链表或者一颗红黑树中的,都是hash冲突的key-value,我到今天才发现!!!惭愧！！！
 
 #### 4.1.2 treeifyBin
 
@@ -965,8 +970,6 @@ static int tieBreakOrder(Object a, Object b) {
 
 该方法就是返回对象`a`或`b`的默认hashcode,无论`a`或者`b`是否override了`hashCode`方法。`null`的`hashCode`为0。
 
-
-
 经过上述最多三次的抉择,终于能决定待插入节点`x`和树中的节点谁大谁小了。那么抉择出来了,就可以在数中插入节点`x`了吗?当然不行,我们需要在RB树中找到一个合适的叶节点才能插入。下面的代码就是寻找合适的叶节点:
 
 ``` java
@@ -989,7 +992,7 @@ for (TreeNode<K,V> p = root;;) {
 
     TreeNode<K,V> xp = p;
     //dir<=0就插入到左子树中,否则插入到右子树中,并且如果目标方向的子节点为空,才会进行插入
-    //否则继续向下遍历寻找合适的位置
+    //否则继续向下遍历寻找合适的位置 
     if ((p = (dir <= 0) ? p.left : p.right) == null) {
         x.parent = xp;
         if (dir <= 0)
@@ -1003,7 +1006,15 @@ for (TreeNode<K,V> p = root;;) {
 }
 ```
 
-在插入完成后,需要平衡以下节点之间的颜色。
+在找到插入位置并完成插入后,需要调用`balanceInsertion`平衡节点之间的颜色。这个函数是红黑树的调整的核心操作。我把注释都写在了代码中:
+
+``` java
+
+
+```
+
+
+
 
 [为什么HashMap的get方法没有写成泛型？](https://stackoverflow.com/questions/857420/what-are-the-reasons-why-map-getobject-key-is-not-fully-generic)
 
