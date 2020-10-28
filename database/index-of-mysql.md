@@ -110,11 +110,11 @@ Extension:为什么需要限制表中每一行的大小？
 
 与聚簇索引相反，如果使用非主键的列作为索引的key，那么基于该列构建的索引就是非聚簇索引。
 
-使用非聚簇索引进行查询时会产生**回表**操作。因为每组key-value中的value不再对应于具体的某一行，而是对应该表的主键。查找到对应的主键后，再使用主键在表中进行查找。
+使用非聚簇索引进行查询时**可能**会产生**回表**操作。因为每组key-value中的value不再对应于具体的某一行，而是对应该表的主键。查找到对应的主键后，再使用主键在表中进行查找。
 
 ### 2.3 逻辑角度
 
-1.  唯一索引(UNIQUE)：所谓的唯一索引，就是列值必须唯一，但是允许NULL值
+1. 唯一索引(UNIQUE)：所谓的唯一索引，就是列值必须唯一，但是允许NULL值
 
 2. 主键索引(PRIMARY KEY)：一种特殊的**唯一索引**，要求索引列值唯一，并且不允许NULL值
 
@@ -158,6 +158,7 @@ Extension:为什么需要限制表中每一行的大小？
 3. 数据类型越简单越好，尽量避免NULL值，因为为null建立优化比较困难
 4. 尽量选择区分度较高的列作为索引，公式为count(distinct col)/count(*)
 5. 尽量扩展索引，而不是新建索引
+6. 尽量使用自增字段
 
 ### 3.3 索引的缺点
 
@@ -176,6 +177,37 @@ Extension:为什么需要限制表中每一行的大小？
 2. where查询时的条件，使用or时只有一个字段具有索引
 3. where查询条件使用NOT、!=或者<>，只会产生全表扫描
 4. 使用like时，%在最开头，因为索引不知道怎么匹配，这个最容易理解
+
+### 3.6 建立索引三种方式
+
+1. 使用`create index`创建索引，但是这种方法只能创建普通索引或者唯一索引，不能创建主键索引
+
+``` sql
+create [index]|[unique index] <index name> on <table name> (column list)
+```
+2. 使用`alter table`创建索引，这种方式能够创建普通、主键、唯一三种索引。
+
+``` sql
+#创建主键索引时只能有一个列，或者是联合主键
+#同理创建UNIQUE时也必须保证所选的列值唯一
+alter table [table name] add [index] |[unique index] |[primary key] <index name> (column list);
+```
+
+3. 在创建表的时候创建，例如：
+
+``` sql
+CREATE TABLE user_index2 (
+	id INT auto_increment PRIMARY KEY,
+	first_name VARCHAR (16),
+	last_name VARCHAR (16),
+	id_card VARCHAR (18),
+	information text,
+	KEY name (first_name, last_name),
+	FULLTEXT KEY (information),
+	UNIQUE KEY (id_card)
+);
+
+```
 
 ## 参考文献
 
