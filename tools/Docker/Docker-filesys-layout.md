@@ -76,8 +76,7 @@ overlayFS的基本用法可以参考[官网](https://wiki.archlinux.org/index.ph
 ![merge-tree](images/merge-tree.png)
 
 最后在merge目录中的`aa`文件来自`lower1`,`bb`文件来自`upper`。`foo`文件来自`lower`与`upper`。如下图所示：
-
-<div align=center>![result](images/result.png)</div>
+![result](images/result.png)
 
 可以看到确实将同名的底层文件都隐藏了起来。
 
@@ -97,7 +96,7 @@ overlayFS中的删除并不是真正的删除,它只是使用了一个障眼法-
 
 >whiteout文件并非普通文件，而是主次设备号都为0的字符设备（可以通过"mknod <name> c 0 0"命令手动创建）
 
->并且whiteout文件再merge层不可见。达到了隐藏文件的目的
+>并且whiteout文件在merge层不可见。达到了隐藏文件的目的
 
 删除操作分为三个场景：
 
