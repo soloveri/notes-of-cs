@@ -101,6 +101,44 @@ IO多路复用模型的工作场景如下：
 
 
 
+### select
+
+缺点：
+
+1. 在**每次**调用`select`时都会将目标socket集合`fd_set`从用户空间拷贝至内核空间，所以当socket集合很大时，每次拷贝的效率会非常低
+2. `select`内部每次使用**轮询操作**探查是否有socket的对应事件准备完毕，因为其使用的`fd_set`由数组组成，大小一般限制为1024(因为操作系统对每个进程可用的最大描述符数限制了上限，可在编译时重新设置)，所以每次轮询都需要完整遍历，这又会使`select`效率变低
+3. 在找到准备好的socket集合后，`select`又会将所有的`fd_set`再从内核拷贝至用户空间，再次将`select`效率变低
+4. 在每次调用`select`时，之前设置的`fd_set`都会失效，所以每次循环前都需要重新设置`fd_set`.
+
+
+### poll
+
+`poll`与`select`并无大的差别，只不过`poll`使用的socket集合`pollfd`没有大小的限制，因为底层是采用链表实现的，所以`select`有的缺点`poll`都会存在
+
+### epoll
+
+`epoll`是`poll`的升级版，`epoll`的API分为三个部分：
+
+``` c
+int epoll_create(int size);
+int epoll_ctl(int epfd, int op, int fd, struct epoll_event *event);
+int epoll_wait(int epfd, struct epoll_event * events, int maxevents, int timeout);
+```
+
+1. epoll_create：首先调用`epoll_create`创建`poll`对象。并且会开辟一个红黑树与就绪队列。红黑树用来保存我们需要监听的socket结合，就绪队列用来保存已经准备就绪的socket集合
+2. epoll_ctl：注册要监听的事件类型。在每次注册新的事件到epoll句柄中时，会把对应的socket复制到内核中，注意对于一个socket，在`epoll`中只会被复制一次而不像`select`每次调用时都会复制。并且同时会向内核注册回调函数，大致功能是当该socket事件完成时将其加入就绪队列
+3. epoll_wait：等待事件的就绪，其只用遍历就绪队列，所以`epoll`的复杂度至于活跃的连接数有关。并且就绪socket集合采用了内存映射，减少了拷贝fds的操作。同时`epoll_wait`返回后，会将就绪socket对应事件清空，如果后续仍想关注当前处理的socket，那么就需要用epoll_ctl(epfd,EPOLL_CTL_MOD,listenfd,&ev)来重新设置socket fd的事件类型，**而不需要重新注册fd**
+
+epoll解决了什么问题：
+
+1. epoll通过回调机制实现了知道哪个socket的哪些事件准备完成，这在`select`中需要通过轮询完成(这里并不是指在`epoll_wait`返回后不需要遍历小于返回值的fd，仍然需要循环遍历socket进行处理)
+2. epoll只会在fd初次注册使用`epoll_ctl`时拷贝至内核,而`select`每次都需要完整的拷贝所有fd，并且每次都需要重新设置描述符结合，因为每次`select`返回后都会修改描述符集合
+
+### 小结
+
+
+select低效的原因之一是将“维护等待队列”和“阻塞进程”两个步骤合二为一。如下图所示，每次调用select都需要这两步操作，然而大多数应用场景中，需要监视的socket相对固定，并不需要每次都修改。epoll将这两个操作分开，先用epoll_ctl维护等待队列，再调用epoll_wait阻塞进程。显而易见的，效率就能得到提升。
+
 
 
 ## 参考文献
@@ -114,3 +152,5 @@ IO多路复用模型的工作场景如下：
 4. [怎样理解阻塞非阻塞与同步异步的区别？](https://www.zhihu.com/question/19732473)
 
 5. [I/O 多路复用，select / poll / epoll 详解](https://imageslr.github.io/2020/02/27/select-poll-epoll.html)
+
+6. [Linux编程之select](https://www.cnblogs.com/skyfsm/p/7079458.html)
