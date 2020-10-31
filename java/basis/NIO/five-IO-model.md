@@ -263,12 +263,11 @@ epoll有EPOLLLT和EPOLLET两种触发模式。它们主要的区别有两点：
 
 5. [I/O 多路复用，select / poll / epoll 详解](https://imageslr.github.io/2020/02/27/select-poll-epoll.html)
 
-<<<<<<< HEAD
 6. [Linux编程之select](https://www.cnblogs.com/skyfsm/p/7079458.html)
-=======
-6. [关于非阻塞I/O、多路复用、epoll的杂谈](https://www.cnblogs.com/upnote/p/12017212.html)
 
-6. [select、poll、epoll之间的区别(搜狗面试)](https://www.cnblogs.com/aspirant/p/9166944.html)
+7. [关于非阻塞I/O、多路复用、epoll的杂谈](https://www.cnblogs.com/upnote/p/12017212.html)
 
-7. [poll原理详解及epoll反应堆模型](https://blog.csdn.net/daaikuaichuan/article/details/83862311)
->>>>>>> 3749c30993bab2a61b72831b09f6b19fe7f18fa2
+8. [select、poll、epoll之间的区别(搜狗面试)](https://www.cnblogs.com/aspirant/p/9166944.html)
+
+9. [poll原理详解及epoll反应堆模型](https://blog.csdn.net/daaikuaichuan/article/details/83862311)
+
