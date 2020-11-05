@@ -181,6 +181,7 @@ int select(int nfds, fd_set *rdfds, fd_set *wtfds, fd_set *exfds, struct timeval
 3. 那么在函数返回后，我们并不知道是哪个socket的什么事件准备好了，所以我们需要**遍历我们的socket**，依次探测所有类型的事件是否完成，不管这个socket到底对当前探测的事件是否感兴趣，并且又会把相应的socket拷贝至用户空间
 4. 在进行新一轮的`select`调用时,又得重新设置socket集合，因为上一轮已经改变了集合
 
+
 当然`select`存在很多缺点：
 
 1. 在**每次**调用`select`时都会将目标socket集合`fd_set`从用户空间拷贝至内核空间，所以当socket集合很大时，每次拷贝的效率会非常低
@@ -262,8 +263,11 @@ epoll有EPOLLLT和EPOLLET两种触发模式。它们主要的区别有两点：
 
 5. [I/O 多路复用，select / poll / epoll 详解](https://imageslr.github.io/2020/02/27/select-poll-epoll.html)
 
-6. [关于非阻塞I/O、多路复用、epoll的杂谈](https://www.cnblogs.com/upnote/p/12017212.html)
+6. [Linux编程之select](https://www.cnblogs.com/skyfsm/p/7079458.html)
 
-6. [select、poll、epoll之间的区别(搜狗面试)](https://www.cnblogs.com/aspirant/p/9166944.html)
+7. [关于非阻塞I/O、多路复用、epoll的杂谈](https://www.cnblogs.com/upnote/p/12017212.html)
 
-7. [poll原理详解及epoll反应堆模型](https://blog.csdn.net/daaikuaichuan/article/details/83862311)
+8. [select、poll、epoll之间的区别(搜狗面试)](https://www.cnblogs.com/aspirant/p/9166944.html)
+
+9. [poll原理详解及epoll反应堆模型](https://blog.csdn.net/daaikuaichuan/article/details/83862311)
+
