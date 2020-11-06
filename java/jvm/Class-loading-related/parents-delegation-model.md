@@ -43,3 +43,12 @@ categories: jvm
 应用程序类加载器通用由java编写，在代码中可以直接引用。该加载器是我们接触最多的加载器了，默认情况下，我们编写的class都由其加载至jvm中。它负责加载由`classpath`参数指定路径下的类库。
 
 >应用程序类加载器由`sun.misc.Launcher$AppClassLoader`实现。并且应用程序类加载器是ClassLoader中的getSystemClassLoader()方法的返回值
+
+
+**参考文献**
+
+https://greenhathg.github.io/2019/06/02/Java%E8%99%9A%E6%8B%9F%E6%9C%BA%E7%AC%94%E8%AE%B0-Launcher%E7%B1%BB/
+
+https://juejin.im/post/6844903837472423944
+
+https://segmentfault.com/a/1190000021869536
