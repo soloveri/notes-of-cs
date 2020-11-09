@@ -361,7 +361,6 @@ protected Class<?> loadClass(String name, boolean resolve)
 
 开发人员又设计了一种叫进程上下文类加载器(Thread Context ClassLoader)的东西来完成这个任务。启动类加载器会调用进程上下文类加载器来加载接口的实现类。所谓的进程上下文类加载器又是什么呢？这在详解数据库驱动加载一文中由详细介绍。这里不再作解释。
 
-
 ### 3.3 第三次破坏
 
 
