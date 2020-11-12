@@ -103,7 +103,7 @@ public class Launcher {
 
 3. 使用`Thread.currentThread().setContextClassLoader(this.loader)`初始化线程上下文加载器，其中`loader`字段就是第二步生成的应用类加载器
 
-此外我们还需要关注以下`App ClassLoader`的生成方法，因为其与`classpath`的设置嘻嘻相关。
+此外我们还需要关注以下`App ClassLoader`的生成方法，因为其与`classpath`的设置息息相关。
 
 ``` java
 public static ClassLoader getAppClassLoader(final ClassLoader var0) throws IOException {
@@ -200,7 +200,7 @@ protected Class<?> loadClass(String name, boolean resolve)
 
 **系统类加载器的设置**
 
-我曾在上面提到，如果没有意外发生，那么在jvm中，`AppClassLoader`会被设置为默认的系统类加载器，这也是为什么会在某些场合称其为“统类加载器”。那么这一设置是什么时候完成的呢？这一切都起源于`ClassLoader`中的方法`getSystemClassLoader`。其注释写道：
+我曾在上面提到，如果没有意外发生，那么在jvm中，`AppClassLoader`会被设置为默认的系统类加载器，这也是为什么会在某些场合称其为“系统类加载器”。那么这一设置是什么时候完成的呢？这一切都起源于`ClassLoader`中的方法`getSystemClassLoader`。其注释写道：
 
 >If the system property "java.system.class.loader" is defined
 when this method is first invoked then the value of that property is
@@ -357,9 +357,11 @@ protected Class<?> loadClass(String name, boolean resolve)
 
 但是在双亲委派模型中，上层的类加载器是无法指派下层的类加载器来完成加载动作的。一个典型的例子就是JNDI(The Java Naming and Directory Interface)服务。简而言之，JDNI就是java规定一组服务的接口，但是具体的实现由第三方提供，例如数据库的驱动。
 
-那么这个破坏在哪里呢？首先JDNI肯定是由启动类加载器加载至JVM。那么调用具体的实现类时，启动类加载器是不可能将实现类加载进来的，因为这不符合启动类加载器的规定。那么怎么办呢？
+那么这个**破坏**在哪里呢？首先JDNI肯定是由启动类加载器加载至JVM。那么调用具体的实现类时，启动类加载器是不可能将实现类加载进来的，因为这不符合启动类加载器的规定。那么怎么办呢？
 
-开发人员又设计了一种叫进程上下文类加载器(Thread Context ClassLoader)的东西来完成这个任务。启动类加载器会调用进程上下文类加载器来加载接口的实现类。所谓的进程上下文类加载器又是什么呢？这在详解数据库驱动加载一文中由详细介绍。这里不再作解释。
+开发人员又设计了一种叫进程上下文类加载器(Thread Context ClassLoader)的东西来完成这个任务。启动类加载器会调用进程上下文类加载器来加载接口的实现类。
+
+线程上下文类加载器在(默认情况下)由`Bootstrap classLoader`第一次加载`Launcher`类时就会被设置为`App ClassLoader`。当然，我们可以通过`setContextClassLoader(ClassLoader cl)`和`getContextClassLoader()`来设置和使用我们自定义的线程上下文类加载器。**在多线程的情况下**，子线程会继承父线程的线程上下文类加载器。
 
 ### 3.3 第三次破坏
 
