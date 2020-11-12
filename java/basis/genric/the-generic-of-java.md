@@ -205,29 +205,29 @@ class People<T>{
 
 ``` java
 public static boolean equals(Object[] a, Object[] a2) {
-        if (a==a2)
-            return true;
-        if (a==null || a2==null)
-            return false;
-
-        int length = a.length;
-        if (a2.length != length)
-            return false;
-
-        for (int i=0; i<length; i++) {
-            Object o1 = a[i];
-            Object o2 = a2[i];
-            if (!(o1==null ? o2==null : o1.equals(o2)))
-                return false;
-        }
-
+    if (a==a2)
         return true;
+    if (a==null || a2==null)
+        return false;
+
+    int length = a.length;
+    if (a2.length != length)
+        return false;
+
+    for (int i=0; i<length; i++) {
+        Object o1 = a[i];
+        Object o2 = a2[i];
+        if (!(o1==null ? o2==null : o1.equals(o2)))
+            return false;
     }
 
+    return true;
+}
 ```
+
 **如果**数组是不支持协变的,那么比较`B`时得重写`equals`的代码,比较`A`时又得重写一份`equals`的代码,因为`A[]`不能赋值给`Object[]`,代码重写非常严重,违背了代码复用的宗旨。所以将数组设计成协变的,使得`A[]`能够赋值为`Object[]`,从而调用对象的`equals()`方法时,由于多态的原因,实际上调用的`A`的`equals`方法。实现了代码复用。
 
-那么数组设计成协变会产生大问题吗?答案是不会,因为数组记得它到底保持的是什么类型,这会在运行时检查类型。
+那么数组设计成协变会产生大问题吗?答案是不会,因为数组记得它到底保持的是什么类型,这会在**编译时**严格检查数据类型。而泛型协变有问题也只会在运行时出现，延后了问题出现的时间。违背了java是严格类型确定的编程语言。
 
 但是**并不支持**泛型数组,因为数组能记得它存储的元素类型的前提是在创建时就严格确定了其存储的元素类型(之所以能记住这是靠虚拟机实现的,Array由虚拟机来实现)。
 
@@ -418,7 +418,28 @@ candy eat air.
 
 **B. 下界通配符:**
 
-相应的,上界通配符实现的简单意义上的只写功能。例如`List<? super Husky> animals`,其中`husky`是`Dog`的子类,这里能存入的元素类型至多是`Husky`类型,没有上界,那么就是`Object`。因为即使传入的参数`List<Animal>`还是`List<Dog>`,将子类对象赋值给父类引用时是没有任何问题(例如`List<Dog>`中存储的都是`Dog`类型的引用,可以使用任意的`Dog`的子类赋值到`List`中)。
+相应的,上界通配符实现的简单意义上的只写功能。例如`List<? super Husky> animals`,其中`husky`是`Dog`的子类,这里能存入的元素类型至多是`Husky`类型,没有上界,那么就是`Object`。
+
+我们可以在`animals`中存储任意的`animals`子类对象(就像`List<Dog>`中存储的都是`Dog`类型的引用,但是可以在`List`中存储任意的`Dog`子类)。
+
+``` java
+class Husky extends Dog{
+    public Husky(String name){
+        super(name);
+    }
+}
+
+public static void main(String[] args){
+    List<Dog> list=new ArrayList<>();
+    insert(list);
+}
+
+public static void insert(List<? super Dog> set){
+    //成功添加
+    set.add(new Husky("husky"));
+    System.out.println("success");
+}
+```
 
 ![lower-bound](images/lower-bound.drawio.svg)
 
@@ -426,7 +447,7 @@ candy eat air.
 
 所以如果容器中存在有下界通配符的泛型,那么该容器在非严格意义上是**只写**的。
 
-这里的存下取上原则也叫做`PECS`原则,即`producer-extends,consumer super`。以容器的视角来说,当容器作为作为生产者,往外提供元素时,就使用`extends`;当容器作为消费者,需要使用元素时,就使用`super`。
+这里的存下取上原则也叫做`PECS`原则,即`producer-extends,consumer super`。以容器的视角来说,当容器作为作为生产者,往外提供元素时,就使用`extends`;当容器作为消费者,需要存储元素时,就使用`super`。
 
 在`Collections.copy`方法中,就是用PESC原则:
 
