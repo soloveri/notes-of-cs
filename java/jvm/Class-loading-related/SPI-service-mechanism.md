@@ -336,3 +336,8 @@ public static Class<?> forName(String className)
 ## 4. 小结
 
 SPI的核心`ServiceLoader`类，而该类的核心又是内部实现的`LazyIterator`。在实现SPI时，规定实现库的jar包中必须在`META-INF/services/`目录下存放以目标SPI命名的文件，其中的内容就是厂商具体实现类的全限定名。
+
+但是SPI仍然是有缺点的：
+
+- 对于某一项服务，会加载所有的实现类，但是其中有一些我们并不需要
+- 会存在并发问题
