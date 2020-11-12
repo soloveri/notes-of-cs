@@ -277,7 +277,7 @@ public class Driver extends NonRegisteringDriver implements java.sql.Driver {
 
 非常简单，一旦进行实例化，就会执行静态构造代码块，mysql实现的`Driver`会主动向`DriverManger`提出注册请求。至此，已经完成了数据库驱动的一次注册过程。
 
-### 2.4 获得数据库连接对象
+### 2.3 获得数据库连接对象
 
 `DriverManager`会遍历所有已经注册过的驱动，如果能成功连接目标数据库，那么就返回当前连接对象，否则继续遍历剩下的Driver实例直至结束。下面是遍历驱动的核心代码：
 
