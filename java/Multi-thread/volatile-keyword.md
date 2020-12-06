@@ -13,7 +13,11 @@ categories:
 
 volatile是什么
 
+所谓的禁止指令重排也是为了保证内存的可见性
+
 volatile如何实现的
+
+volatile真的禁止重排序了吗
 
 volatile是怎么用的
 
