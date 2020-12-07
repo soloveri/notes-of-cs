@@ -19,6 +19,9 @@ volatile如何实现的
 
 volatile真的禁止重排序了吗
 
+volatile的内存屏障是实现hb的技术手段，之所以需要插入各种内存屏障完全是因为要实现hb relation
+对volatile写后，不仅要求其他线程能够看到新写的值，而且还要求能够看到导致volatile值改变的代码带来的侧面影响
+
 volatile是怎么用的
 
 
