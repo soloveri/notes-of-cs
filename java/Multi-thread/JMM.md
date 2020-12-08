@@ -43,52 +43,58 @@ x86架构采用的就是强内存模型，所以在汇编中最多使用`StoreLo
 
 ## 2. JMM是什么
 
-因为每一个架构都有它自己的内存模型，这就可能带来Java程序的移植性问题。所以为了屏蔽底层架构的内存模型的差异性，Java开发团队为Java在多架构的背景下提出了跨平台的、具有移植性的内存模型，即Java memory model。它同样是靠指令中插入内存屏障（memory barrier）来实现的。其插入屏障的策略非常保守：
+因为每一个架构都有它自己的内存模型，这就可能带来Java程序的移植性问题。所以为了屏蔽底层架构的内存模型的差异性，Java开发团队为Java在多架构的背景下提出了跨平台的、具有移植性的内存模型，即Java memory model。它同样是靠指令中插入内存屏障（memory barrier）来实现的。我们先不谈JMM内存屏障的插入策略。我们思考一个问题，插入策略是如何制定的。
 
-
-
-在JSR-133之后，JMM是一组基于`happens before`关系（后文简称hb）的规则。hb通过保证部分指令的有序性达到内存可见性，并且极大地简化了并发编程的难度。如果`操作A hb 操作B`，那么编译器、处理器以及内存系统必须保证操作A的结果对操作B可见。
+在JSR-133之后，JMM是一组基于`happens before`关系（后文简称hb）的规则。hb通过保证**部分**指令的有序性达到内存可见性，并且极大地简化了并发编程的难度。如果`操作A hb 操作B`，那么编译器、处理器以及内存系统必须保证操作A的结果对操作B可见。
 
 ### 2.1 happens before relation
 
 hb规则总计下面6条（简而言之就是read/write,lock/unlock,start/join threads）：
 
-- 程序次序规则(single thread rule) ：一个线程内，按照代码**控制流**顺序，编码在前面的操作先行发生于编码在后面的操作；
+- 程序次序规则(single thread rule) ：一个线程内，按照原始书写的**没有被重排序**的代码**控制流**顺序，编码在前面的`action` 先行发生于编码在后面的`action`([action的定义](https://docs.oracle.com/javase/specs/jls/se7/html/jls-17.html#jls-17.4.3))；
 ![single thread rule](images/thread-start-rule.png)
 
-- 锁定规则(monitor lock rule)：对于一个monitor lock的unLock操作先行发生于后面所有的对同一个monitor lock的lock操作；
+- 锁定规则(monitor lock rule)：对于一个monitor lock的unLock操作 `happens before` 后面所有的对同一个monitor lock的lock操作；
 ![monitor lock rule](images/monitor-lock-rule.png)
 
-- volatile变量规则(volatile variable rule)：对一个volatile变量的写操作先行发生于后面所有的对这个变量的读操作；
+- volatile变量规则(volatile variable rule)：对一个volatile变量的写操作`happens before`后面所有的对这个变量的读操作；
 ![volatile-variable-rule](images/volatile-variable-rule.png)
 
-- 线程启动规则（thread start rule）：Thread对象的start()方法先行发生于当前被启动线程的`run()`方法中的每个一个动作；
+- 线程启动规则（thread start rule）：Thread对象的start()方法`happens before`当前被启动线程的`run()`方法中的每个一个动作；
 ![thread-start-rule](images/thread-start-rule.png)
 
 - 线程终结规则（thread join rule）：假定线程A在执行的过程中，通过调用ThreadB.join()等待线程B终止，那么在join()返回后，线程B在run()完成的操作在线程A都可见
 ![thread-join-rule](images/thread-join-rule.png)
 
-- 传递规则(thread start rule)：如果操作A先行发生于操作B，而操作B又先行发生于操作C，则可以得出操作A先行发生于操作C；
+- 传递规则(thread start rule)：如果操作A`happens before`操作B，而操作B又`happens before`操作C，则可以得出操作A`happens before`操作C；但是如果有 operation1(o1) & operation2(o2) `happens before` operation3，并不能推导出 o1 `happens before` o2。所以o1和o2之间有没有重排序JMM并不关心
 
 通过上面六条规则，可以总结出四个方面的hb关系：
 
 1. 初始化
-    - 将字段初始化为默认值（例如将int初始化为0、boolean初始化为false）的操作 先行发生于（hb） 任何线程对同一字段地访问操作
-    - 对`static final`字段的写操作 先行发生于(hb) 任何线程对该字段的读操作
-    - 对`non-static final`字段的写操作 先行发生于(hb) 该线程后续通过引用访问当前对象同一字段的操作
+    - 将字段初始化为默认值（例如将int初始化为0、boolean初始化为false）的操作 `happens before` 任何线程对同一字段地访问操作
+    - 对`static final`字段的写操作 `happens before` 任何线程对该字段的读操作
+    - 对`non-static final`字段的写操作 `happens before` 该线程后续通过引用访问当前对象同一字段的操作
 2. 内存访问
-    - 对一个monitor lock的unlock操作或者volatile写操作（volatile就相当于unlock操作，因为完成volatile写后，volatile读能够读到新值，就像unlock时，unlock之前的操作对lock操作来说都是可见的） 先行发生于 任意线程对同一个monitor lock的lock操作或者对同一字段的volatile读
-    - volatile读或者lock操作 先行发生于 当前线程后续对内存的所有操作
+    - 对一个monitor lock的unlock操作或者volatile写操作（volatile就相当于unlock操作，因为完成volatile写后，volatile读能够读到新值，就像unlock时，unlock之前的操作对lock操作来说都是可见的） `happens before` 任意线程对同一个monitor lock的lock操作或者对同一字段的volatile读
+    - volatile读或者lock操作 `happens before` 当前线程后续对内存的所有操作
 3. 原子操作
     - `java.utl.concurrent.atmoic.get()`方法的效果相当于volatile读，`xxxx.set()`方法的效果相当于volatile写
-    - `weakCompareAndSet` 先行发生于 当前线程后续所有对原子字段的操作
+    - `weakCompareAndSet` `happens before` 当前线程后续所有对原子字段的操作
 4. 线程
-    - `Thread.start()`方法之前的所有操作 先行发生于 新线程`run()`方法中的所有操作
-    - 任何写操作 先行发生于 当前线程的终止操作
+    - `Thread.start()`方法之前的所有操作 `happens before` 新线程`run()`方法中的所有操作
+    - 任何写操作 `happens before` 当前线程的终止操作
 
-上面的规则有点难以理解，但是我们要记住一句：
+上面的规则有点难以理解，但是我们要记住一句话：
 
->**规则 A hb B，仅保证如果（注意是如果）A发生了，那么B一定能看到，但是并不保证A一定发生在B前面** 如果没hb规则，即使A先于B发生，B也有可能看不到
+>**规则 A hb B，仅表示JMM保证A的操作结果能被B看到，并不保证操作A一定在操作B之前发生。**
+那么在JMM保证的基础上，如果（注意是如果）A发生了，那么B一定能看到。我们需要做的就是保证这个“如果”在某些特定情况下变成“必须”，想想如果没有hb规则，那么即使A先于B发生，B也有可能看不到A的操作结果。
+
+---
+是否可以等价于：
+
+若有 A hb B，那么如果A先于B发生，A的结果B一定能看到。JMM为了完成“一定能看到”这个操作，会使用内存屏障。至于如果B发生了，A还没发生，这时候的情况JMM根本不关心，它不需要保证任何东西。
+
+---
 
 ``` java
 
@@ -99,6 +105,8 @@ int b=2;
 ```
 
 如果对指令进行重排序后的结果和遵守A hb B的执行是一样的（简而言之就是操作A和B不会发生访问冲突，没有共享内存），那么JVM并不会禁止这样的重排序。
+
+1&2 hb 3，那么1和2之间可以随意重排序
 
 
 ## 参考文献
