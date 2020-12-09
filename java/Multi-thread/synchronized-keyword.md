@@ -95,3 +95,10 @@ class demo{
 1. [Java中的Monitor机制](https://segmentfault.com/a/1190000016417017)
 
 2. [探索Java同步机制](https://developer.ibm.com/zh/articles/j-lo-synchronized/)
+
+
+https://blog.csdn.net/L__ear/article/details/106369509
+
+https://blog.csdn.net/DBC_121/article/details/105453101
+
+https://www.mdeditor.tw/pl/2Z1b
