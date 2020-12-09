@@ -51,7 +51,7 @@ x86架构采用的就是强内存模型，所以在汇编中最多使用`StoreLo
 
 hb规则总计下面6条（简而言之就是read/write,lock/unlock,start/join threads）：
 
-- 程序次序规则(single thread rule) ：一个线程内，按照原始书写的**没有被重排序**的代码**控制流**顺序，编码在前面的`action` 先行发生于编码在后面的`action`([action的定义](https://docs.oracle.com/javase/specs/jls/se7/html/jls-17.html#jls-17.4.3))；
+- 程序次序规则(single thread rule) ：一个线程内，按照原始书写的**没有被重排序**的代码**控制流**顺序，编码在前面的`action`（包括内存读写、解锁、上锁等） 先行发生于编码在后面的`action`([action的定义](https://docs.oracle.com/javase/specs/jls/se7/html/jls-17.html#jls-17.4.3))；
 ![single thread rule](images/thread-start-rule.png)
 
 - 锁定规则(monitor lock rule)：对于一个monitor lock的unLock操作 `happens before` 后面所有的对同一个monitor lock的lock操作；
@@ -88,15 +88,6 @@ hb规则总计下面6条（简而言之就是read/write,lock/unlock,start/join t
 
 >**规则 A hb B，仅表示JMM保证（通过内存屏障实现）A的操作结果能被B看到，并不保证操作A一定在操作B之前发生。**
 那么在JMM保证的基础上，如果（注意是如果）A发生了，那么B一定能看到。我们需要做的就是保证这个“如果”在某些特定情况下变成“必须”。想想如果没有hb规则，那么即使A先于B发生，B也有可能看不到A的操作结果。
-
----
-
-我一直有个问题：如果有A hb B，那么是不是只有A先比B发生，JMM才会使用内存屏障达到B一定能够看到A的效果。也就是说，如果A没有比B先发生，JMM就不会使用内存屏障实现A hb B了？很明显这个表述是有问题的，但是我一直不知道如何否定这个表述。经过几天的思考，我给出我的理解：
-
-比如对于volatile变量读写规则，JMM先按照理想情况下，即
-
-
----
 
 ``` java
 
