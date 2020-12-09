@@ -63,7 +63,7 @@ public class DraconianSingleton {
 
 ## 2.volatile做了什么
 
-volatile能够禁止上述重排的原因是因为它在volatile write操作之前插入了内存屏障，禁止volatile write操作之前任何的read/write操作重排序到volatile write之后。在执行`new DraconianSingleton()`时，构造函数肯定会执行write操作，所以构造函数的write操作一定不会被重排序到volatile write操作之后，从而保证了只会在实例化对象完成后才会`instance`赋值。
+volatile能够禁止上述指令重排的原因是因为它在volatile write操作之前插入了内存屏障，禁止volatile write操作之前任何的read/write操作重排序到volatile write之后。在执行`new DraconianSingleton()`时，构造函数肯定会执行write操作，所以构造函数的write操作一定不会被重排序到volatile write操作之后，从而保证了只会在实例化对象完成后才会`instance`赋值。
 
 网上许多文章都说volatile会执行上述的操作禁止指令重排，但是几乎没有人说它为什么这么做。我尝试使用如下代码解释一下我的理解：
 
@@ -85,12 +85,29 @@ volatile能够禁止上述重排的原因是因为它在volatile write操作之�
 ```
 
 根据happens before的程序次序原则，o1 hb o2，那么JMM保证o1的执行结果必须被o2看到。我们可以延伸一下，volatile write之前所有的动作结果都应该在volatile write执行时被看到。所以为了实现这个效果，JMM会在volatile write之前插入StoreStore、StoreLoad内存屏障（这是最笨、最稳妥的办法，具体实现时肯定会有相应的优化。
-根据happens before的volatile变量规则，o2 hb o3，JMM保证o2（volatile写）的执行结果必须被o3（volatile读）看到。为了实现这个效果，需要借助内存屏障的力量。
+根据happens before的volatile变量规则，o2 hb o3，JMM保证o2（volatile写）的执行结果必须被o3（volatile读）看到。为了实现这个效果，需要借助StoreLoad内存屏障的力量。
 
 **所以volatile做这些工作都是为了实现happens before relation**。内存屏障只是volatile实现happens before的**技术手段**。并且volatile并不会刷新内存，那不是它的责任，刷新内存是内存屏障的作用。
 
+---
 
-## 4. volatile如何使用
+**对于volatile的一些小疑问：**
+
+**Q1：对于volatile write(A) hb volatile read(B)，是不是只有A先比B发生，JMM才会使用内存屏障达到B一定能够看到A的效果（即实现 A hb B）。也就是说，如果A没有比B先发生，JMM就不会使用内存屏障实现A hb B了？**
+
+很明显这个表述是有问题的，但是我一直不知道如何否定这个逻辑。经过几天的思考，我给出我的理解：
+对于volatile write(A) hb volatile read(B)，JMM不管A与B谁先发生，它只管使用内存屏障达到：如果A发生，B就能看到结果的效果（换言之，JMM按照理想情况，A先发生B后发生的情形插入内存屏障）。这样就会有：
+
+- 如果A比B先发生，那么就能实现A hb B的效果
+- 如果B比A先发生，那么虽然插入了内存屏障，但是也没有产生什么负面效果
+
+**Q2：volatile真的禁止重排序了吗？**
+
+我认为volatile并没有这么做，volatile它只是借助内存屏障禁止volatile write之前的任何read/write重排序到volatile write之后，至于那些read/write操作到底如何重排序，volatile并不care
+
+---
+
+## 3. volatile如何使用
 
 首先我们需要知道volatile只有read/write操作具有原子性，剩余的基于volatile的算数运算并没有原子性。例如：
 
@@ -106,7 +123,6 @@ volatile能够禁止上述重排的原因是因为它在volatile write操作之�
             }.start();
         }
     }
-    
 ```
 
 上述`j++`并不具有原子性。想象以下多线程的场景：
