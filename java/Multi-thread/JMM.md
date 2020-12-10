@@ -99,8 +99,6 @@ int b=2;
 
 如果对指令进行重排序后的结果和遵守A hb B的执行是一样的（简而言之就是操作A和B不会发生访问冲突，没有共享内存），那么JVM并不会禁止这样的重排序。
 
-1&2 hb 3，那么1和2之间可以随意重排序
-
 
 ## 参考文献
 
@@ -108,3 +106,6 @@ int b=2;
 
 2. [JMM Synopsis](http://gee.cs.oswego.edu/dl/cpj/JMMsynopsis.html)
 
+3. [Java memory model](https://www.waitingforcode.com/java-memory-model/java-memory-model/read)
+
+4. [Multithreading and the Java Memory Model](https://dzone.com/articles/multithreading-and-java-memory)
