@@ -78,3 +78,7 @@ StackOverFlow要么是死递归造成的栈空间不够,要么是局部变量太
 上述这种操作就避免了在java堆中和native中频繁的复制数据。
 
 native堆的分配大小一般都会忽略,导致各个内存区域的大小总和超过了本机主机内存,从而出现OOM。
+
+## 参考文献
+
+1. [Understanding Java Memory Model](https://medium.com/platform-engineer/understanding-java-memory-model-1d0863f6d973)
