@@ -159,9 +159,9 @@ class ObjectMonitor {
 
 其中有几点需要注意，在一个线程每次成功获取偏向锁时，**会在当前线程的`Lock Record`队列中插入一个`Lock Record(LR)`**,并且设置新插入LR中的owner指向当前监视器对象（monitor object），具体的实现代码如下所示：
 
-
 ``` java
 //代码分析摘自：Synchronized 源码分析（http://itliusir.com/2019/11-Synchronized/）
+//来自bytecodeInterpreter.cpp
 
 CASE(_monitorenter): {
   oop lockee = STACK_OBJECT(-1);
@@ -202,13 +202,13 @@ CASE(_monitorenter): {
          ^ (uintptr_t)mark) 
         // 将上面结果中的分代年龄忽略掉
         &~((uintptr_t) markOopDesc::age_mask_in_place);
-			// ① 为0代表偏向线程是当前线程 且 对象头的epoch与class的epoch相等，什么也不做
-      if  (anticipated_bias_locking_value == 0) {
-        if (PrintBiasedLockingStatistics) {
-          (* BiasedLocking::biased_lock_entry_count_addr())++;
+        // ① 为0代表偏向线程是当前线程 且 对象头的epoch与class的epoch相等，什么也不做
+        if  (anticipated_bias_locking_value == 0) {
+            if (PrintBiasedLockingStatistics) {
+            (* BiasedLocking::biased_lock_entry_count_addr())++;
+            }
+            success = true;
         }
-        success = true;
-      }
       // ② 偏向模式关闭，则尝试撤销(0 01)
       else if ((anticipated_bias_locking_value & markOopDesc::biased_lock_mask_in_place) != 0) {
         // try revoke bias
@@ -321,7 +321,6 @@ InterpreterRuntime::monitorenter --> ObjectSynchronizer::fast_enter --> BiasedLo
 
 我们着重分析`revoke_and_rebias`与`revoke_bias`
 
-
 ``` java
 static BiasedLocking::Condition revoke_bias(oop obj, bool allow_rebias, bool is_bulk, JavaThread* requesting_thread) {
   markOop mark = obj->mark();
@@ -413,16 +412,95 @@ static BiasedLocking::Condition revoke_bias(oop obj, bool allow_rebias, bool is_
 
   return BiasedLocking::BIAS_REVOKED;
 }
-
-
 ```
 
+上述代码中只有一点需要注意：在判断线程是否处于同步状态时，遍历的`Lock Record`正是线程在获取锁时添加到线程中的只有`owner`指针的`Lock Record`。
 
-### 3. 轻量锁
+1. 所以当偏向锁产生最普通的竞争时，JVM会首先JVM中所有存活的线程中是否存在偏向锁偏向的线程。如果存在，执行（2），否则执行（4）
+
+2. 判断偏向锁偏向的线程当前是否处于同步区，这通过遍历目标线程的`Lock Record`集合实现（为什么能这么做呢？这跟偏向锁的释放有关，见后文）。如果处于同步区，则执行（3），否则执行（4）
+
+3. 将最先关联到线程的`Lock Record`结构中的`Displace markword`设置为无锁模式，然后将monitor object对象头的markdown设置为指向`Displace markword`的指针（处于safepoint，所有线程终止）。至此，完成轻量锁的升级。注意，此时轻量锁的归属权仍然属于原来获得偏向锁的线程
+
+4. 如果开启可重偏向，那么则将monitor object对象的markword设置为匿名偏向模式，否则执行（5）
+
+5. 将将monitor object对象头的markword设置为无锁模式
+
+### 3.1.3 偏向锁的释放流程
+
+偏向锁的释放流程比较简单：
+
+``` java
+//代码来自：bytecodeInterpreter.cpp
+CASE(_monitorexit): {
+  oop lockee = STACK_OBJECT(-1);
+  CHECK_NULL(lockee);
+  // derefing's lockee ought to provoke implicit null check
+  // find our monitor slot
+  BasicObjectLock* limit = istate->monitor_base();
+  BasicObjectLock* most_recent = (BasicObjectLock*) istate->stack_base();
+  // 从低往高遍历栈的Lock Record
+  while (most_recent != limit ) {
+    // 如果Lock Record关联的是该锁对象
+    if ((most_recent)->obj() == lockee) {
+      BasicLock* lock = most_recent->lock();
+      markOop header = lock->displaced_header();
+      // 释放Lock Record
+      most_recent->set_obj(NULL);
+      // 如果是偏向模式，仅仅释放Lock Record就好了。否则要走轻量级锁or重量级锁的释放流程
+      if (!lockee->mark()->has_bias_pattern()) {
+        bool call_vm = UseHeavyMonitors;
+        // header!=NULL说明不是重入，则需要将Displaced Mark Word CAS到对象头的Mark Word
+        if (header != NULL || call_vm) {
+          if (call_vm || Atomic::cmpxchg_ptr(header, lockee->mark_addr(), lock) != lock) {
+            // CAS失败或者是重量级锁则会走到这里，先将obj还原，然后调用monitorexit方法
+            most_recent->set_obj(lockee);
+            CALL_VM(InterpreterRuntime::monitorexit(THREAD, most_recent), handle_exception);
+          }
+        }
+      }
+      //执行下一条命令
+      UPDATE_PC_AND_TOS_AND_CONTINUE(1, -1);
+    }
+    //处理下一条Lock Record
+    most_recent++;
+  }
+  // Need to throw illegal monitor state exception
+  CALL_VM(InterpreterRuntime::throw_illegal_monitor_state_exception(THREAD), handle_exception);
+  ShouldNotReachHere();
+}
+```
+
+对于偏向锁，代码从低往高的遍历`Lock Record`，因为加进去的时候就是按照从高往低加入的。它将当前遍历的`Lock Record`中的owner指针都置为null，表示当前线程释放了偏向锁。这也就是为什么在偏向锁撤销的过程中，通过查看线程中的`Lock Record`的owner指针是否指向monitor object就能判断当前持有偏向锁的线程是否处于同步区。因为如果不处于同步区，线程肯定会释放偏向锁，并且将owner置为null。
+
+## 3.2 轻量锁
 
 轻量锁的来源有两处：
 
-1. 通过偏向锁
+1. 通过偏向锁升级而来
+2. 关闭偏向模式
+
+轻量锁和偏向锁的区别在哪呢？
+
+1. 偏向锁只需要在第一次请求锁使用CAS设置ThreadID，而轻量锁需要在每次请求锁时都使用CAS修改markword
+
+2. 偏向锁只适用于一个线程进入临界区，轻量锁适用于多个线程交替地进入临界区（交替是指不会发生争夺锁的冲突）
+
+### 3.2.1 轻量锁的申请流程
+
+
+### 3.2.2 轻量锁的撤销流程
+
+
+
+### 3.2.3 轻量锁的释放流程
+
+
+当然大部分时候都是通过偏向锁升级而来
+
+## 3.3 重量锁
+
+### 3.3.1
 
 自旋
 适应性自旋
