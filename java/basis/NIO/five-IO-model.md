@@ -16,7 +16,7 @@ categories: IO
 ## 1. 广义维度下的区分
 
 相信很多人在编写多线程程序最大的难度就是让各个线程之间同步合作。那么根据<<操作系统概念>>(第九版)一书中关于进程之间通信部分小节的同步异步概念:([怎样理解阻塞非阻塞与同步异步的区别?](https://www.zhihu.com/question/19732473))
-![os](os.jpg)
+![os](images/os.jpg)
 
 其中说到进程之间的消息传递可以分为阻塞或者非阻塞的，也即是同步或者异步的。发送和接受动作分别可以细分为两种情况：
 
@@ -49,7 +49,7 @@ categories: IO
 
 首先阻塞IO模型最符合我们的惯性思维，模型如下图所示(图片应该来自unix网络编程一书，未经本人考证):
 
-![blocking-IO](blocking-IO.jpg)
+![blocking-IO](images/blocking-IO.jpg)
 
 在linux的世界里，一切皆文件。那么我们也可以将socket当作一种特殊的文件来进行独写。在默认情况下socket为**阻塞**模式，那么当用户进程调用`recvfrom`后，由于此时IO数据尚未准备完成，用户进程会被阻塞(处于等待阶段)，直到数据准备完成。此时用户进程还是会被阻塞至数据拷贝至用户空间（处于拷贝阶段）。
 
@@ -57,7 +57,7 @@ categories: IO
 
 ### 2.2 非阻塞IO模型
 
-![non-blocking-IO](non-blocking-IO.jpg)
+![non-blocking-IO](images/non-blocking-IO.jpg)
 
 上图为非阻塞IO模型的基本示意图。
 
@@ -71,21 +71,21 @@ categories: IO
 
 所谓的**多路**是指多个socket的读写，**复用**是指所有的IO都可以通过复用一个或几个线程来完成。基本模型如下图所示：
 
-![IO-multixing](multiplexing-IO.jpg)
+![IO-multixing](images/multiplexing-IO.jpg)
 
 IO多路复用模型的工作场景如下：
 
 假设我们现在有socket A、B需要进行IO操作，有三种方案：
 
-1. 单线程，采用阻塞IO模型：这就是将所有的IO操作串行，当两个socket流量都非常低且不活跃时，效率非常低
-2. 单线程，采用非阻塞IO模型，不断对A、B进行轮循操作，当然仍然会浪费大量的时间
-3. 采用多线程，阻塞IO模型，将A、B的IO轮循任务分配两个子线程。虽然这样效率比前面两种方案都高，但是线程是非常宝贵的资源，创建与销毁线程代价昂贵
+1. 单线程，采用阻塞IO模型：这就是将所有的IO操作串行，当两个socket流量都非常低且不活跃时，效率非常低，有可能排在后面的socket已经准备好了，但是当前处理线程仍然在等待第一个socket的数据
+2. 单线程，采用非阻塞IO模型，不断对A、B进行轮循操作，当然仍然会浪费大量的时间，并且不断使用**多次使用系统调用**查看一个socket，代价也比较高昂
+3. 采用多线程，阻塞IO模型，将A、B的IO轮循任务分配两个子线程。虽然这样效率比前面两种方案都高，但是线程是非常宝贵的资源，**不停的切换线程**、创建与销毁线程的代价都昂贵。
 
-难道我们就不能让socket完成数据准备后自己通知用户线程吗？这样就能避免大量不必要的轮循操作。当然这是可行的。也就是使用linux平台的select、poll、epoll等系统调用。对应于java中的NIO。
+难道我们就不能通过一次系统调用查看多个socket，让socket完成数据准备后自己通知用户线程吗？当然这是可行的，就是使用linux平台的select、poll、epoll等系统调用。对应于java中的NIO。**一次系统调用监控多个socket**就是多路IO复用模型出现的原因。
 
 这里我首先以`select`作为例子。基本的流程如下：
 
-1. 我们将需要操作的socket注册到`select`函数中，并绑定我们感兴趣的操作，例如是读还是写。然后调用`select`。**注意`select`仍然会阻塞用户进程**。
+1. 我们将需要操作的socket注册到`select`函数中，并绑定我们感兴趣的操作，例如是读还是写。然后调用`select`。**注意：在没有socket准备好时，`select`仍然会阻塞用户进程**。
 2. `select`会不断的对注册的socket进行轮循操作，直至有可用的socket出现，此时该函数会返回，但剩余未准备好的socket仍然可以继续准备。
 3. 对可用的socket进行感兴趣的操作。然后继续调用`select`
 
@@ -97,7 +97,7 @@ IO多路复用模型的工作场景如下：
 
 信号模型如下图所示：
 
-![signal-IO](signal-IO.png)
+![signal-IO](images/signal-IO.png)
 
 信号IO模型似乎用的不是很多，所以对于其的介绍我引用自[Unix 网络 IO 模型: 同步异步, 傻傻分不清楚?](https://segmentfault.com/a/1190000007355931)：
 
@@ -107,7 +107,7 @@ IO多路复用模型的工作场景如下：
 ### 2.5 异步IO模型
 
 所谓的异步IO模型，是在我们进行系统调用后直接返回，但并不像阻塞IO模型返回`EWOULDBLOCK`，具体返回什么有待学习。然后当数据准备完毕并拷贝至用户空间时，内核会发送信号通知用户进程处理数据。模型如下所示：
-![asyn-IO](asynchronus-IO.jpg)
+![asyn-IO](images/asynchronus-IO.jpg)
 
 可以看到，异步IO模型甚至不需要我们拷贝数据，当然异步IO在网络编程中很少用到，可能会用在文件IO中。
 
@@ -141,7 +141,7 @@ A synchronous I/O operation does not imply synchronized I/O data integrity compl
 
 那么我就可以得知，阻塞IO模型、非阻塞IO模型、多路复用IO模型、信号通知模型都是同步I/O操作。下图很好地进行了总结：
 
-![IO-model-summary](IO-model-summary.jpg)
+![IO-model-summary](images/IO-model-summary.jpg)
 
 
 ### 2.7 小节
@@ -206,8 +206,8 @@ int epoll_wait(int epfd, struct epoll_event * events, int maxevents, in
 ```
 
 1. epoll_create：首先调用`epoll_create`创建`poll`对象。并且会开辟一个红黑树与就绪队列。红黑树用来保存我们需要监听的socket结合，就绪队列用来保存已经准备就绪的socket集合
-2. epoll_ctl：注册要监听的事件类型。在每次注册新的事件到epoll句柄中时，会把对应的socket复制到内核中，注意对于一个socket，在`epoll`中**只会被复制一次**，不像`select`**每次调用**时都会复制。并且同时会向内核注册回调函数，大致功能是当该socket事件完成时将其加入就绪队列。
-3. epoll_wait：等待事件的就绪，其只用遍历就绪队列，所以`epoll`的复杂度至于活跃的连接数有关。并且返回就绪socket集合**采用了内存映射**，进一步减少了拷贝fds的操作。但是同时`epoll_wait`返回后，会将就绪socket对应事件清空，如果后续仍想关注当前处理的socket，那么就需要用epoll_ctl(epfd,EPOLL_CTL_MOD,listenfd,&ev)来重新设置socket fd的事件类型，**而不需要重新注册fd**
+2. epoll_ctl：注册要监听的事件类型。在每次注册新的事件到epoll句柄中时，会把对应的socket复制到内核中，注意对于一个socket，在`epoll`中**只会被复制一次**，不像`select`**每次调用**时都会复制。并且同时会向内核注册回调函数，大致功能是当该socket关注的事件完成时将其加入就绪队列。
+3. epoll_wait：等待事件的就绪，其只用遍历就绪队列，所以`epoll`的复杂度至于活跃的连接数有关。~~并且返回就绪socket集合**采用了内存映射**，进一步减少了拷贝fds的操作~~，好吧，这句话是错的，并没有内存映射，[参考](https://www.zhihu.com/question/39792257)。但是同时`epoll_wait`返回后，会将就绪socket对应事件清空，如果后续仍想关注当前处理的socket，那么就需要用epoll_ctl(epfd,EPOLL_CTL_MOD,listenfd,&ev)来重新设置socket fd的关注事件类型，**而不需要重新注册fd**
 
 **epoll解决了什么问题：**
 
@@ -226,7 +226,7 @@ epoll有EPOLLLT和EPOLLET两种触发模式。它们主要的区别有两点：
 但是ET模式下，如果一个socket的数据不能一次处理完毕，该socket就会被认为状态未发生改变。所以我们一般会采用循环处理socket的所有数据。这又产生了新的问题。如果该socket被设置阻塞模式，在循环进行最后一次读取时，读取到的数据必然为空，当前线程会被阻塞，直到该socket收到数据。
 那么LT模式如果有阻塞socket的数据一次不能处理完呢？解决方法就是我们就不需要使用循环读取所有数据，只需调用一次，因为LT模式下该socket还会出现在就绪队列中。
 
-所以我们一般**建议**在使用ET模式将socket设置为阻塞模式。但是这并不说明ET模式下不能将socket设置为阻塞模式。如果socket的数据一次能够读取完毕，那么也不会阻塞当前线程。所以我们说建议，因为ET模式的阻塞socket可能会产生预想不到的问题。**同时也说明是否阻塞socket并不影响多路复用IO模型的使用。**
+所以我们一般**建议**在使用ET模式将socket设置为**非阻塞模式**。但是这并不说明ET模式下不能将socket设置为阻塞模式。如果socket的数据一次能够读取完毕，那么也不会阻塞当前线程。所以我们说建议，因为ET模式的阻塞socket可能会产生预想不到的问题。**同时也说明是否阻塞socket并不影响多路复用IO模型的使用。**
 
 ### 3.4 小结
 
@@ -242,7 +242,7 @@ epoll有EPOLLLT和EPOLLET两种触发模式。它们主要的区别有两点：
 那么`epoll`比`select`快是理由的：
 
 1. 因为在大部分情况下我们需要监听的fd集合是固定的，`epoll`不会进行重复注册
-2. 在每次设置fd的目标事件时，因为`epoll`内部采用的红黑树，查找对应的`socket`都是`o(lgn)`的复杂度。而`select`需要设置所有的fd集合。
+2. 在每次设置fd的目标事件时，因为`epoll`内部采用的红黑树保存需要监听的fd集合，查找对应的`socket`都是`o(lgn)`的复杂度。而`select`需要设置所有的带监听的fd集合。
 
 **那么在任何时候都应该优选选择`epoll`吗？**
 
