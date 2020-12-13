@@ -730,13 +730,449 @@ CASE(_monitorexit): {
 
 ## 3.3 重量锁
 
+重量级锁就是使用`objectmonitor`（使用操作系统的mutex）完成同步的工具。
 
+### 3.3.1 重量锁的获取流程
+
+获取重量锁的地方有两个：
+
+1. 如果在`fast_enter`中偏向锁升级轻量级锁失败，那么会调用`slow_enter`
+2. 在不开启偏向模式的情况下，直接调用`slow_enter`。在`slow_enter`中先尝试是否能够使用轻量级锁，如果失败，则直接调用`inflate`方法直接膨胀为重量级锁
+
+我们知道，重锁是需要一个`objectmonitor`维护互斥锁的。这个对象就是`inflate`中构建的。`inflate`主要流程如下：
+
+1. 如果锁已经达到重量级状态，则直接返回
+2. 如果是轻量级锁状态，那么则需要膨胀
+3. 如果锁是膨胀中状态，那么则通过**自旋**操作完成忙等待
+4. 如果是无锁状态，那么则需要进行膨胀
+
+锁膨胀完成后，那么各个线程则尝试通过调用`enter`方法获取锁进入临界区，分析如下：
+
+``` java
+void ATTR ObjectMonitor::enter(TRAPS) {
+   
+  Thread * const Self = THREAD ;
+  void * cur ;
+  // owner为null代表无锁状态，如果能CAS设置成功，则当前线程直接获得锁
+  cur = Atomic::cmpxchg_ptr (Self, &_owner, NULL) ;
+  if (cur == NULL) {
+     ...
+     return ;
+  }
+  // 如果是重入的情况
+  if (cur == Self) {
+     // TODO-FIXME: check for integer overflow!  BUGID 6557169.
+     _recursions ++ ;
+     return ;
+  }
+  // 当前线程是之前持有轻量级锁的线程。由轻量级锁膨胀且第一次调用enter方法，那cur是指向Lock Record的指针
+  if (Self->is_lock_owned ((address)cur)) {
+    assert (_recursions == 0, "internal state error");
+    // 重入计数重置为1
+    _recursions = 1 ;
+    // 设置owner字段为当前线程（之前owner是指向Lock Record的指针）
+    _owner = Self ;
+    OwnerIsThread = 1 ;
+    return ;
+  }
+
+  ...
+
+  // 在调用系统的同步操作之前，先尝试自旋获得锁
+  if (Knob_SpinEarly && TrySpin (Self) > 0) {
+     ...
+     //自旋的过程中获得了锁，则直接返回
+     Self->_Stalled = 0 ;
+     return ;
+  }
+
+  ...
+
+  { 
+    ...
+
+    for (;;) {
+      jt->set_suspend_equivalent();
+      // 在该方法中调用系统同步操作
+      EnterI (THREAD) ;
+      ...
+    }
+    Self->set_current_pending_monitor(NULL);
+    
+  }
+
+  ...
+}
+```
+
+在`enter()`中，只能完成三种获取锁的动作，包括无锁状态获取锁（即锁没有被占有）、轻量级锁获取锁、重入锁这三种情况。超出这三种情况，需要调用`enterI()`完成系统同步的操作。当然在调用系统同步操作之前，会尝试自旋获取锁。
+
+在前面说过，监视锁`objectmonitor`维护了两个队列`_EntryList`、`_WaitList`用来保存被阻塞等待锁的线程和主动调用`wait()`等待锁的线程。其实在源码中， `objectmonitor` 还维护了一个队列`_cxq`,用来给`_EntryList`提供被阻塞的线程。这三者的关系如下图所示：
+
+![syn](images/synchronized.png)
+
+当一个线程尝试获得锁时，如果该锁已经被占用，则会将该线程封装成一个ObjectWaiter对象插入到cxq队列的队首，然后调用park函数挂起当前线程。在linux系统上，park函数底层调用的是gclib库的pthread_cond_wait。
+
+当线程释放锁时，会从cxq或EntryList中挑选一个线程唤醒，被选中的线程叫做Heir presumptive即假定继承人（即图中的ready thread），假定继承人被唤醒后会尝试获得锁，但synchronized是非公平的，所以假定继承人不一定能获得锁（这也是它叫"假定"继承人的原因）。
+
+如果线程获得锁后调用Object#wait方法，则会将线程加入到WaitSet中，当被Object#notify唤醒后，会将线程从WaitSet移动到cxq或EntryList中去。需要注意的是，**当调用一个锁对象的wait或notify方法时，如当前锁的状态是偏向锁或轻量级锁则会先膨胀成重量级锁。** 源码分析如下：
+
+
+``` java
+void ATTR ObjectMonitor::EnterI (TRAPS) {
+    Thread * Self = THREAD ;
+    ...
+    // 尝试获得锁
+    if (TryLock (Self) > 0) {
+        ...
+        return ;
+    }
+
+    DeferredInitialize () ;
+ 
+	// 自旋
+    if (TrySpin (Self) > 0) {
+        ...
+        return ;
+    }
+    
+    ...
+
+    // 将线程封装成node节点中
+    ObjectWaiter node(Self) ;
+    Self->_ParkEvent->reset() ;
+    node._prev   = (ObjectWaiter *) 0xBAD ;
+    node.TState  = ObjectWaiter::TS_CXQ ;
+
+    // 将node节点插入到_cxq队列的头部，cxq是一个单向链表
+    ObjectWaiter * nxt ;
+    for (;;) {
+        node._next = nxt = _cxq ;
+        if (Atomic::cmpxchg_ptr (&node, &_cxq, nxt) == nxt) break ;
+
+        // CAS失败的话 再尝试获得锁，这样可以降低插入到_cxq队列的频率
+        if (TryLock (Self) > 0) {
+            ...
+            return ;
+        }
+    }
+
+	// SyncFlags默认为0，如果没有其他等待的线程，则将_Responsible设置为自己
+    if ((SyncFlags & 16) == 0 && nxt == NULL && _EntryList == NULL) {
+        Atomic::cmpxchg_ptr (Self, &_Responsible, NULL) ;
+    }
+
+
+    TEVENT (Inflated enter - Contention) ;
+    int nWakeups = 0 ;
+    int RecheckInterval = 1 ;
+
+    for (;;) {
+
+        if (TryLock (Self) > 0) break ;
+        assert (_owner != Self, "invariant") ;
+
+        ...
+
+        // park self
+        if (_Responsible == Self || (SyncFlags & 1)) {
+            // 当前线程是_Responsible时，调用的是带时间参数的park
+            TEVENT (Inflated enter - park TIMED) ;
+            Self->_ParkEvent->park ((jlong) RecheckInterval) ;
+            // Increase the RecheckInterval, but clamp the value.
+            RecheckInterval *= 8 ;
+            if (RecheckInterval > 1000) RecheckInterval = 1000 ;
+        } else {
+            //否则直接调用park挂起当前线程
+            TEVENT (Inflated enter - park UNTIMED) ;
+            Self->_ParkEvent->park() ;
+        }
+
+        if (TryLock(Self) > 0) break ;
+
+        ...
+        
+        if ((Knob_SpinAfterFutile & 1) && TrySpin (Self) > 0) break ;
+
+       	...
+        // 在释放锁时，_succ会被设置为EntryList或_cxq中的一个线程
+        if (_succ == Self) _succ = NULL ;
+
+        // Invariant: after clearing _succ a thread *must* retry _owner before parking.
+        OrderAccess::fence() ;
+    }
+
+   // 走到这里说明已经获得锁了
+
+    assert (_owner == Self      , "invariant") ;
+    assert (object() != NULL    , "invariant") ;
+  
+	// 将当前线程的node从cxq或EntryList中移除
+    UnlinkAfterAcquire (Self, &node) ;
+    if (_succ == Self) _succ = NULL ;
+	if (_Responsible == Self) {
+        _Responsible = NULL ;
+        OrderAccess::fence();
+    }
+    ...
+    return ;
+}
+
+```
+
+主要步骤有3步：
+
+1. 将当前线程插入到cxq队列的队首
+2. 然后park当前线程
+3. 当被唤醒后再尝试获得锁
+
+这里需要特别说明的是_Responsible和_succ两个字段的作用：
+
+当竞争发生时，选取一个线程作为_Responsible，_Responsible线程调用的是有时间限制的park方法，其目的是防止出现搁浅现象。
+
+_succ线程是在线程释放锁是被设置，其含义是Heir presumptive，也就是我们上面说的假定继承人。
+
+### 3.3.2 重量锁的释放流程
+
+重量级锁释放的代码在ObjectMonitor::exit,在释放锁时，JVM需要提供下一个需要准备获取锁的线程（如果有线程需要的话），代码如下：
+
+``` java
+void ATTR ObjectMonitor::exit(bool not_suspended, TRAPS) {
+   Thread * Self = THREAD ;
+   // 如果_owner不是当前线程
+   if (THREAD != _owner) {
+     // 当前线程是之前持有轻量级锁的线程。由轻量级锁膨胀后还没调用过enter方法，_owner会是指向Lock Record的指针。
+     if (THREAD->is_lock_owned((address) _owner)) {
+       assert (_recursions == 0, "invariant") ;
+       _owner = THREAD ;
+       _recursions = 0 ;
+       OwnerIsThread = 1 ;
+     } else {
+       // 异常情况:当前不是持有锁的线程
+       TEVENT (Exit - Throw IMSX) ;
+       assert(false, "Non-balanced monitor enter/exit!");
+       if (false) {
+          THROW(vmSymbols::java_lang_IllegalMonitorStateException());
+       }
+       return;
+     }
+   }
+   // 重入计数器还不为0，则计数器-1后返回
+   if (_recursions != 0) {
+     _recursions--;        // this is simple recursive enter
+     TEVENT (Inflated exit - recursive) ;
+     return ;
+   }
+
+   // _Responsible设置为null
+   if ((SyncFlags & 4) == 0) {
+      _Responsible = NULL ;
+   }
+
+   ...
+
+   for (;;) {
+      assert (THREAD == _owner, "invariant") ;
+
+      // Knob_ExitPolicy默认为0
+      if (Knob_ExitPolicy == 0) {
+         // code 1：先释放锁，这时如果有其他线程进入同步块则能获得锁
+         OrderAccess::release_store_ptr (&_owner, NULL) ;   // drop the lock
+         OrderAccess::storeload() ;                         // See if we need to wake a successor
+         // code 2：如果没有等待的线程或已经有假定继承人
+         //有假定继承人表示可能会选择假定继承人作为唤醒对象，以便争夺锁
+         if ((intptr_t(_EntryList)|intptr_t(_cxq)) == 0 || _succ != NULL) {
+            TEVENT (Inflated exit - simple egress) ;
+            return ;
+         }
+         TEVENT (Inflated exit - complex egress) ;
+
+         // code 3：要执行之后的操作需要重新获得锁，即设置_owner为当前线程
+         if (Atomic::cmpxchg_ptr (THREAD, &_owner, NULL) != NULL) {
+            return ;
+         }
+         TEVENT (Exit - Reacquired) ;
+      } 
+      ...
+
+      ObjectWaiter * w = NULL ;
+      // code 4：根据QMode的不同会有不同的唤醒策略，默认为0
+      int QMode = Knob_QMode ;
+      if (QMode == 2 && _cxq != NULL) {
+          // QMode == 2 : cxq中的线程有更高优先级，直接唤醒cxq的队首线程
+          w = _cxq ;
+          assert (w != NULL, "invariant") ;
+          assert (w->TState == ObjectWaiter::TS_CXQ, "Invariant") ;
+          ExitEpilog (Self, w) ;
+          return ;
+      }
+
+      if (QMode == 3 && _cxq != NULL) {
+          // 将cxq中的元素插入到EntryList的末尾
+          w = _cxq ;
+          for (;;) {
+             assert (w != NULL, "Invariant") ;
+             ObjectWaiter * u = (ObjectWaiter *) Atomic::cmpxchg_ptr (NULL, &_cxq, w) ;
+             if (u == w) break ;
+             w = u ;
+          }
+          assert (w != NULL              , "invariant") ;
+
+          ObjectWaiter * q = NULL ;
+          ObjectWaiter * p ;
+          for (p = w ; p != NULL ; p = p->_next) {
+              guarantee (p->TState == ObjectWaiter::TS_CXQ, "Invariant") ;
+              p->TState = ObjectWaiter::TS_ENTER ;
+              p->_prev = q ;
+              q = p ;
+          }
+
+          // Append the RATs to the EntryList
+          // TODO: organize EntryList as a CDLL so we can locate the tail in constant-time.
+          ObjectWaiter * Tail ;
+          for (Tail = _EntryList ; Tail != NULL && Tail->_next != NULL ; Tail = Tail->_next) ;
+          if (Tail == NULL) {
+              _EntryList = w ;
+          } else {
+              Tail->_next = w ;
+              w->_prev = Tail ;
+          }
+
+          // Fall thru into code that tries to wake a successor from EntryList
+      }
+
+      if (QMode == 4 && _cxq != NULL) {
+          // 将cxq插入到EntryList的队首
+          w = _cxq ;
+          for (;;) {
+             assert (w != NULL, "Invariant") ;
+             ObjectWaiter * u = (ObjectWaiter *) Atomic::cmpxchg_ptr (NULL, &_cxq, w) ;
+             if (u == w) break ;
+             w = u ;
+          }
+          assert (w != NULL              , "invariant") ;
+
+          ObjectWaiter * q = NULL ;
+          ObjectWaiter * p ;
+          for (p = w ; p != NULL ; p = p->_next) {
+              guarantee (p->TState == ObjectWaiter::TS_CXQ, "Invariant") ;
+              p->TState = ObjectWaiter::TS_ENTER ;
+              p->_prev = q ;
+              q = p ;
+          }
+
+          // Prepend the RATs to the EntryList
+          if (_EntryList != NULL) {
+              q->_next = _EntryList ;
+              _EntryList->_prev = q ;
+          }
+          _EntryList = w ;
+
+          // Fall thru into code that tries to wake a successor from EntryList
+      }
+
+      w = _EntryList  ;
+      if (w != NULL) {
+          // 如果EntryList不为空，则直接唤醒EntryList的队首元素
+          assert (w->TState == ObjectWaiter::TS_ENTER, "invariant") ;
+          ExitEpilog (Self, w) ;
+          return ;
+      }
+
+      // EntryList为null，则处理cxq中的元素
+      w = _cxq ;
+      if (w == NULL) continue ;
+
+      // 因为之后要将cxq的元素移动到EntryList，所以这里将cxq字段设置为null
+      for (;;) {
+          assert (w != NULL, "Invariant") ;
+          ObjectWaiter * u = (ObjectWaiter *) Atomic::cmpxchg_ptr (NULL, &_cxq, w) ;
+          if (u == w) break ;
+          w = u ;
+      }
+      TEVENT (Inflated exit - drain cxq into EntryList) ;
+
+      assert (w != NULL              , "invariant") ;
+      assert (_EntryList  == NULL    , "invariant") ;
+
+
+      if (QMode == 1) {
+         // QMode == 1 : 将cxq中的元素转移到EntryList，并反转顺序
+         ObjectWaiter * s = NULL ;
+         ObjectWaiter * t = w ;
+         ObjectWaiter * u = NULL ;
+         while (t != NULL) {
+             guarantee (t->TState == ObjectWaiter::TS_CXQ, "invariant") ;
+             t->TState = ObjectWaiter::TS_ENTER ;
+             u = t->_next ;
+             t->_prev = u ;
+             t->_next = s ;
+             s = t;
+             t = u ;
+         }
+         _EntryList  = s ;
+         assert (s != NULL, "invariant") ;
+      } else {
+         // QMode == 0 or QMode == 2‘
+         // 将cxq中的元素转移到EntryList
+         _EntryList = w ;
+         ObjectWaiter * q = NULL ;
+         ObjectWaiter * p ;
+         for (p = w ; p != NULL ; p = p->_next) {
+             guarantee (p->TState == ObjectWaiter::TS_CXQ, "Invariant") ;
+             p->TState = ObjectWaiter::TS_ENTER ;
+             p->_prev = q ;
+             q = p ;
+         }
+      }
+
+
+      // _succ不为null，说明已经有个继承人了，所以不需要当前线程去唤醒，减少上下文切换的比率
+      if (_succ != NULL) continue;
+
+      w = _EntryList  ;
+      // 唤醒EntryList第一个元素
+      if (w != NULL) {
+          guarantee (w->TState == ObjectWaiter::TS_ENTER, "invariant") ;
+          ExitEpilog (Self, w) ;
+          return ;
+      }
+   }
+}
+
+```
+
+代码中的`QMode`表示唤醒下一个线程的策略。
+
+code 1 设置owner为null，即释放锁，这个时刻其他的线程能获取到锁。这里是一个非公平锁的优化；
+
+code 2 如果当前没有等待的线程则直接返回就好了，因为不需要唤醒其他线程。或者如果说succ不为null，代表当前已经有个"醒着的"继承人线程，那当前线程不需要唤醒任何线程；
+
+code 3 当前线程重新获得锁，因为之后要操作cxq和EntryList队列以及唤醒线程；
+
+code 4根据QMode的不同，会执行不同的唤醒策略。
+
+根据QMode的不同，有不同的处理方式：
+
+QMode = 2且cxq非空：取cxq队列队首的ObjectWaiter对象，调用ExitEpilog方法，该方法会唤醒ObjectWaiter对象的线程（即cxq队列首元素），然后立即返回，后面的代码不会执行了；
+QMode = 3且cxq非空：把cxq队列插入到EntryList的尾部；
+QMode = 4且cxq非空：把cxq队列插入到EntryList的头部；
+QMode = 0：暂时什么都不做，继续往下看；
+
+只有QMode=2的时候会提前返回，等于0、3、4的时候都会继续往下执行：
+
+1. 如果EntryList的首元素非空，就取出来调用ExitEpilog方法，该方法会唤醒ObjectWaiter对象的线程（EntryList首元素），然后立即返回；
+2. 如果EntryList的首元素为空，就将cxq的所有元素放入到EntryList中，然后再从EntryList中取出来队首元素执行ExitEpilog方法，然后立即返回；
+
+# 4. synchronized锁的大体流程
+
+偏向锁->轻量锁->重量锁三者转换的大体逻辑如下图：
 
 图片来自[看完这篇恍然大悟，理解Java中的偏向锁，轻量级锁，重量级锁](https://blog.csdn.net/DBC_121/article/details/105453101)
 
 ![lock](images/lock.png)
 
-图片中存在错误：轻量级锁发生竞争时没有自旋操作，直接膨胀为重量级锁
+但是图片中存在错误：轻量级锁发生竞争时没有自旋操作，直接膨胀为重量级锁
 
 ## 参考文献
 
@@ -744,18 +1180,16 @@ CASE(_monitorexit): {
 
 2. [探索Java同步机制](https://developer.ibm.com/zh/articles/j-lo-synchronized/)
 
-4. [Synchronized 源码分析](http://itliusir.com/2019/11-Synchronized/)
+3. [Synchronized 源码分析](http://itliusir.com/2019/11-Synchronized/)
 
-5. [死磕Synchronized底层实现--偏向锁](https://juejin.cn/post/6844903726554038280)
+4. [死磕Synchronized底层实现--偏向锁](https://juejin.cn/post/6844903726554038280)
 
-6. [源码解析-偏向锁撤销流程解读](https://blog.csdn.net/L__ear/article/details/106369509)
+5. [死磕Synchronized底层实现--轻量级锁 #14](https://github.com/farmerjohngit/myblog/issues/14)
 
-7. [死磕Synchronized底层实现--轻量级锁 #14](https://github.com/farmerjohngit/myblog/issues/14)
+6. [死磕Synchronized底层实现--重量级锁 #15](https://github.com/farmerjohngit/myblog/issues/15)
 
-[Lock Record--锁记录](https://www.jianshu.com/p/fd780ef7a2e8)
+7. [源码解析-偏向锁撤销流程解读](https://blog.csdn.net/L__ear/article/details/106369509)
 
-https://blog.csdn.net/L__ear/article/details/106369509
+8.  [Lock Record--锁记录](https://www.jianshu.com/p/fd780ef7a2e8)
 
-https://blog.csdn.net/DBC_121/article/details/105453101
-
-https://www.mdeditor.tw/pl/2Z1b
+9.  [偏向锁到底是怎么回事啊啊啊啊](https://www.mdeditor.tw/pl/2Z1b)
