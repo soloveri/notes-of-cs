@@ -10,13 +10,8 @@ categories:
 ---
 
 
-
-
-
 ``` java
 
-
-``` java
 static final class NonfairSync extends Sync {
     private static final long serialVersionUID = 7316153563782823691L;
 
@@ -140,10 +135,12 @@ private Node enq(final Node node) {
 试想如下一个场景：threadA只设置了tail，还没设置pred.next时间片就用完了。threadB设置了tail和pred.next后，threadA再设置pred.next。结果如下所示：
 
 ![addWaiter-p2](images/addWaiter-p2.drawio.svg)
-那么为什么使用了CAS就会避免上图中的情况发生呢？因为`nodeA`如果CAS失败，后续会进入`enq`中重新设置当前`node`的`prev`指针。
 
-而CAS成功的`nodeB`能够继续保留先前设置的`prev`指针，并且此时`nodeB`已经成功进入队列，设置next指针无需保证原子性。那么在设置next前，pred节点cancel了怎么办？这会产生什么影响吗？这个问题先保留。
+那么为什么使用了CAS就会避免上图中的情况发生呢？
 
+因为`nodeA`如果CAS失败，后续会进入`enq`中重新设置当前`node`的`prev`指针。而CAS成功的`nodeB`能够继续保留先前设置的`prev`指针，并且此时`nodeB`已经成功进入队列，设置next指针无需保证原子性。那么在设置next前，pred节点cancel了怎么办？这会产生什么影响吗？这个问题先保留。
+
+回答一哈：`pred`在设置next时取消的话，当前线程还是没有挂起的，最多被阻塞，所以在`nodeB`挂起之前，会执行`shouldParkAfterFailedAcquire`找到一个可靠的爹来唤醒它。
 
 ``` java
 //调用该方法之前，节点肯定被放入队列了
@@ -254,11 +251,15 @@ private void cancelAcquire(Node node) {
     /*********************************************
         为什么使用CAS设置tail指针？
     *********************************************/
+    //因为有可能在设置tail的时候，有新节点nodeC入队，tail=nodeC，如果此时执行tail=pred，那么nodeC会丢失
+    //或者pred也取消了，tail被设置为pred的前向节点，如果此时执行tail=pred，那么tail就会指向已经取消的pred
     if (node == tail && compareAndSetTail(node, pred)) {
 
         /*********************************************
         * 既然成功与否不重要，为什么使用CAS设置next指针？
+        * 我实在想不出来为什么，可能为了效率？避免next被覆盖为null后，需要从尾到头找到一个有用的节点
         *********************************************/
+    
         compareAndSetNext(pred, predNext, null);
     }
     // 如果node为tail，但是更新tail失败，也会走else流程
@@ -275,7 +276,7 @@ private void cancelAcquire(Node node) {
 
 
         /**********************************************
-        *                    problem1                 *
+        *               problem1 begin                *
         **********************************************/
         if (pred != head &&
             ((ws = pred.waitStatus) == Node.SIGNAL ||
@@ -286,18 +287,16 @@ private void cancelAcquire(Node node) {
             pred.thread != null) 
             
         /**********************************************
-        *                    problem1                 *
+        *                problem1 end                 *
         **********************************************/
-
-
-            {
+        {
             Node next = node.next;
             if (next != null && next.waitStatus <= 0)
             /*********************************************
             * 既然成功与否不重要，为什么使用CAS设置next指针？
             *********************************************/
                 compareAndSetNext(pred, predNext, next);
-        } else {
+        }else{
             unparkSuccessor(node);
         }
 
@@ -306,12 +305,11 @@ private void cancelAcquire(Node node) {
 }
 ```
 
-
 对于`cancelAcquire`函数，我存在许多疑问。但是在解决疑问之前，我们需要知道，如果一个节点已经cancel了，那么这个节点表示的线程即使唤醒了，也不会执行获取锁的操作。因为当前执行的代码早就有可能执行到别的地方，而不是停留在获取锁的地方。
 
 ---
 
-**Question 1：为什么代码中problem1处要设置如此的判断的条件？**
+**Question 1：为什么代码中problem1处要设置如此的判断条件？**
 
 ---
 
@@ -359,7 +357,6 @@ if (pred != head) {
 那么在`node`取消后，`pred`再取消为什么不会有问题呢？这就很简单了，原理如下图所示：
 
 ![cancelAcquire-p4](images/cancelAcquire-p4.drawio.svg)
-
 
 **小结：**
 
