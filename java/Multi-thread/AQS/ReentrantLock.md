@@ -9,6 +9,17 @@ categories:
 - 多线程基础
 ---
 
+## 前言
+
+`ReentrantLock`是基于`AbstractQueueSynchronizer`的可重入锁。分为公平和非公平模式。它的内部类`Sync`继承了`AbstractQueueSynchronizer`。基本结构如下图所示：
+
+![reentrantLock](images/ReentrankLock.png)
+
+其中`NonfairSync`实现了非公平锁的逻辑，`FairSync`实现了公平锁的逻辑。`ReentrantLock`通过内部维护的`Sync`对象实现资源的获取与释放。
+
+# 1.非公平模式
+
+`ReentrantLock`默认为非公平模式，当调用`ReentrantLock.lock()`时，根据多态最终会调用`NonfairSync.lock()`。代码如下所示：
 
 ``` java
 
@@ -23,22 +34,28 @@ static final class NonfairSync extends Sync {
         //这一步体现了非公平，有可能队列里的第一个线程唤醒了，但是没抢到锁，被这个新来的抢到了
         //也就是说不管同步队列里到底有没有内容，先加个塞
 
-        //状态为0表示没有线程持有锁
         //这里设置锁的状态需要为CAS操作
         //因为如果此时有两个线程都先后读取了State=0，threadA和threadB都能够将state设置为1，违背了锁的互斥性
+        
         if (compareAndSetState(0, 1))
             setExclusiveOwnerThread(Thread.currentThread());
         else
             //加塞失败，乖乖的走后面的正常流程
             acquire(1);
     }
-
     protected final boolean tryAcquire(int acquires) {
         return nonfairTryAcquire(acquires);
     }
 }
-
 ```
+
+## 1.1 线程的入队操作
+如果当前线程加塞失败，会调用`AbstractQueueSynchronizer`的`acquire()`方法,该方法不可重写。代码如下所示：
+该方法首先会调用`tryAcquire()`再次加塞，如果获取失败，说明当前线程应该进入同步队列了，不然占着CPU又抢不到锁，不是浪费么。所以通过`addWaiter`进入同步队列,然后通过`accquireQueued`调整当前节点在队列的位置，这有太多的问题。
+
+1. `addWaiter`是怎么实现的？
+2. `accquireQueued`是干嘛的？
+3. `selfInterrupt`是干嘛的？
 
 ``` java
 public final void acquire(int arg) {
@@ -48,6 +65,11 @@ public final void acquire(int arg) {
         acquireQueued(addWaiter(Node.EXCLUSIVE), arg))
         selfInterrupt();
 }
+
+```
+
+
+``` java
 
 //Sync中的nonfairTryAcquire
 final boolean nonfairTryAcquire(int acquires) {
@@ -76,25 +98,27 @@ final boolean nonfairTryAcquire(int acquires) {
 }
 ```
 
+
+
+
+### 1.1.1 `addWaiter`是怎么实现的？
+
+对于这个问题，我们先来看看`addWaiter()`的源码：
+
 ``` java "addWaiter"
 //返回当前线程的node节点
 private Node addWaiter(Node mode) {
     Node node = new Node(Thread.currentThread(), mode);
     // Try the fast path of enq; backup to full enq on failure
     Node pred = tail;
-    //如果此时同步队列还未创建（指tail和head都为空），那么就会直接调用enq
-    //进入到该函数时，当前node还未入队，所以只有可能前向节点取消
+    //如果此时同步队列还未创建（tail和head都为空），那么就会直接调用enq
+    //否则尝试直接入队
     if (pred != null) {
         //node节点是线程私有的，所以下面一句无需保证原子性
-        //即使tail节点被改变了，tail节点有没有可能取消？
-        //也就是在没有执行下面一句时，pred失效？，这是完全有可能发生的
-        //code1
         node.prev = pred;
-        //下面这句表明，只要当前节点没有作为队列的尾部（要求原来的tail必须在node进入之前没有被修改）进入
-        //那么就会调用enq，彼时会重新设置node的前向指针
 
         /**************************************
-        * 为什么要使用CAS操作？
+        * problem1                   
         **************************************/
         if (compareAndSetTail(pred, node)) {
             pred.next = node;
@@ -127,20 +151,26 @@ private Node enq(final Node node) {
 }
 ```
 
-在`addWaiter`中设置tail指针时为什么需要使用CAS呢？原因如下图所示：
+在阅读上面的代码中，我产生一个问题：在`addWaiter`中problem1处，设置tail指针时为什么需要使用CAS呢？经过我的分析，我认为原因如下图所示：
 ![addWaiter-cas](images/addWaiter-p1.drawio.svg)
 
 可以发现，如果设置tail不是原子操作,最后同步队列中threadA的node就会丢失，因为下一个节点只会接在tail节点的后面。并且pred的next有可能发生混乱，比如tail=nodeB，但是pred.next=nodeA。
-
 试想如下一个场景：threadA只设置了tail，还没设置pred.next时间片就用完了。threadB设置了tail和pred.next后，threadA再设置pred.next。结果如下所示：
 
 ![addWaiter-p2](images/addWaiter-p2.drawio.svg)
 
-那么为什么使用了CAS就会避免上图中的情况发生呢？
+那么为什么使用了CAS就会避免上图中的情况发生呢？因为`nodeA`如果CAS失败，后续会进入`enq`重新设置当前`node`的`prev`指针。而CAS成功的`nodeB`能够继续保留先前设置的`prev`指针。
 
-因为`nodeA`如果CAS失败，后续会进入`enq`中重新设置当前`node`的`prev`指针。而CAS成功的`nodeB`能够继续保留先前设置的`prev`指针，并且此时`nodeB`已经成功进入队列，设置next指针无需保证原子性。那么在设置next前，pred节点cancel了怎么办？这会产生什么影响吗？这个问题先保留。
+从上面的代码我们得出结论：**一旦一个节点成功的设置了tail指针，那么这个节点就算成功进入同步同列。**
 
-回答一哈：`pred`在设置next时取消的话，当前线程还是没有挂起的，最多被阻塞，所以在`nodeB`挂起之前，会执行`shouldParkAfterFailedAcquire`找到一个可靠的爹来唤醒它。
+
+
+
+其实是因为`ReentrantLock`在获取锁时是不响应中断的，只会在获取锁后调用补上一个中断操作。如果`accquireQueued`返回true，则表示在获取锁的过程中发生了中断。那么线程是怎么进入同步队列的呢？我们看看`addWaiter`的代码：
+
+### 1.1.2 `accquireQueued`是干嘛的？
+
+既然当前线程已经进入同步队列了，那么下一步就是将自己挂起，不然白白占着CPU，什么也不干。`accquireQueued()`就是用来将目标前程挂起的。但是被挂起之前需要做一些准备工作。
 
 ``` java
 //调用该方法之前，节点肯定被放入队列了
@@ -162,6 +192,7 @@ final boolean acquireQueued(final Node node, int arg) {
                 return interrupted;
             }
             //线程在每次进入挂起之前，都会重新安排当前节点的前向节点，如果前向节点cancel了的话
+            //只有前向节点pred为-1.当前线程才会挂起
             if (shouldParkAfterFailedAcquire(p, node) &&
                 parkAndCheckInterrupt())
                 //被唤醒的都是队列的头节点，或者从头到尾第一个非cancel节点，但是不保证被唤醒的一定能获得锁
@@ -176,7 +207,6 @@ final boolean acquireQueued(final Node node, int arg) {
 ```
 
 ``` java
-//取消的节点
 private static boolean shouldParkAfterFailedAcquire(Node pred, Node node) {
     //如果前向节点的waitStatus为-1，说明可以将当前线程park了
     //否则如果前向节点的waitStatus为0,则在将前向节点状态设为-1后，先不park当前线程，再给一次获取锁的机会
@@ -255,12 +285,14 @@ private void cancelAcquire(Node node) {
     //或者pred也取消了，tail被设置为pred的前向节点，如果此时执行tail=pred，那么tail就会指向已经取消的pred
     if (node == tail && compareAndSetTail(node, pred)) {
 
-        /*********************************************
-        * 既然成功与否不重要，为什么使用CAS设置next指针？
-        * 我实在想不出来为什么，可能为了效率？避免next被覆盖为null后，需要从尾到头找到一个有用的节点
-        *********************************************/
-    
+        /**********************************************
+        *               problem1 begin                *
+        **********************************************/
         compareAndSetNext(pred, predNext, null);
+        /**********************************************
+        *               problem1 begin                *
+        **********************************************/
+    
     }
     // 如果node为tail，但是更新tail失败，也会走else流程
     // 因为更新失败，表示有新节点入队或者pred节点也cancel了
@@ -276,7 +308,7 @@ private void cancelAcquire(Node node) {
 
 
         /**********************************************
-        *               problem1 begin                *
+        *               problem2 begin                *
         **********************************************/
         if (pred != head &&
             ((ws = pred.waitStatus) == Node.SIGNAL ||
@@ -287,15 +319,19 @@ private void cancelAcquire(Node node) {
             pred.thread != null) 
             
         /**********************************************
-        *                problem1 end                 *
+        *                problem2 end                 *
         **********************************************/
         {
             Node next = node.next;
             if (next != null && next.waitStatus <= 0)
-            /*********************************************
-            * 既然成功与否不重要，为什么使用CAS设置next指针？
-            *********************************************/
+
+            /**********************************************
+            *               problem3 begin                *
+            **********************************************/
                 compareAndSetNext(pred, predNext, next);
+            /**********************************************
+            *                problem3 end                 *
+            **********************************************/
         }else{
             unparkSuccessor(node);
         }
@@ -309,7 +345,32 @@ private void cancelAcquire(Node node) {
 
 ---
 
-**Question 1：为什么代码中problem1处要设置如此的判断条件？**
+**Question 1：既然代码中problem1处，的CAS成功与否并不重要，那么为什么要使用CAS？**
+
+---
+
+首先我认为使用CAS的原因有两点：
+
+1. 不覆盖其他线程的操作结果
+2. 加快查找下一个唤醒的目标线程
+
+假设现在有线程A要取消获取锁，在执行完`compareAndSetTail(node, pred)`后，就切换到了线程B，此时同步队列状态如下图所示:
+
+![cancelAcquire-p5](images/cancelAcquire-p5.drawio.svg)
+
+随后线程B进入同步队列，或者线程C也恰巧进入同步队列，此时同步队列状态如下所示：
+
+![cancelAcquire-p6](images/cancelAcquire-p6.drawio.svg)
+
+
+然后切换到线程A执行`compareAndSetNext(pred, predNext, null);`，正常情况下这里肯定失败，不会产生错误的后果。**但是如果这里没有使用CAS**，那么就仍会执行`nodeA_pred.next=null`，结果如下所示：
+
+![cancelAcquire-p7](images/cancelAcquire-p7.drawio.svg)
+
+当nodeA_pred释放锁后，它需要唤醒下一个节点，`nodeA_pred.next=null`。所以就需要从尾部`tail`开始向前遍历同步队列。当队列很长时，这种遍历是耗时的，但是这种情况可以通过CAS避免。达到了快速找到下一个唤醒线程的目标。
+
+---
+**Question 2：为什么代码中problem2处要设置如此的判断条件？**
 
 ---
 
@@ -365,10 +426,24 @@ if (pred != head) {
 
 ---
 
-**Question 2：cancelAcquire中为什么只设置next指针？？**
+**Question 3：既然代码中problem3处，的CAS成功与否并不重要，那么为什么要使用CAS？**
 
 ---
 
+我的理解是：使用CAS能够避免唤醒链的中断。试想如下一种场景：threadA正在取消节点，正准备执行`compareAndSetNext(pred, predNext, next);`时切换threadB。threadB排在threadA后面。恰巧threadB也在取消节点，并且取消的是尾节点tail，取消完成后状态如下所示：
+
+![cancelAcquire-p8](images/cancelAcquire-p8.drawio.svg)
+
+恰巧此时有新节点入队，入队完成后，又切换到threadA执行`compareAndSetNext(pred, predNext, next);`。如果这不是CAS操作，那么threadA会继续执行`nodeA_pred.next=next(nodeB)`。执行完成后，同步队列如下所示：
+
+![cancelAcquire-p9](images/cancelAcquire-p9.drawio.svg)
+
+那么在`nodeA_pred`释放锁后，唤醒的线程是`nodeB`，但是`nodeB`已经取消了，唤醒它有什么用呢？后面新入队的节点再也不会被唤醒。导致唤醒链中断。
+
+
+
+
+那么就可以总结出：如果被取消节点`node`的前向节点`pred`的next指针设置失败时，就说明`node`的直系后继节点`next`可能已经失效了，自然不能执行`pred.next=node.next`（这个操作由CAS来保证）。
 
 if (ws < 0)
     compareAndSetWaitStatus(node, ws, 0);
