@@ -2,20 +2,20 @@
 title: ReentrantLock源码解析
 mathjax: true
 data: 2020-12-17 18:38:33
-updated: 
+updated: 2020-12-22 21:45:18
 tags: 
-- synchronized
+- ReentrantLock
 categories:
 - 多线程基础
 ---
 
 ## 1. 预备知识
 
-`ReentrantLock`是基于`AbstractQueueSynchronizer`的可重入锁。分为公平和非公平模式。它的内部类`Sync`继承了`AbstractQueueSynchronizer`。基本结构如下图所示：
+`ReentrantLock`是基于`AbstractQueueSynchronizer`的可重入锁。分为公平和非公平模式。它的内部类`Sync`继承了`AbstractQueueSynchronizer`，具体的资源获取与释放由`Sync`来实现，基本结构如下图所示：
 
 ![reentrantLock](images/ReentrankLock.png)
 
-其中`NonfairSync`实现了非公平锁的逻辑，`FairSync`实现了公平锁的逻辑。`ReentrantLock`通过内部维护的`Sync`对象实现资源的获取与释放。
+其中`NonfairSync`实现了非公平锁的逻辑，`FairSync`实现了公平锁的逻辑。
 
 ## 2. ReentrantLock的加锁流程
 
@@ -50,7 +50,8 @@ static final class NonfairSync extends Sync {
 
 ``` java
 public final void acquire(int arg) {
-    //因为多态，所以调用ReentrantLock的tryAcquire,这个tryAcquire是不会操作同步队列的
+    //因为多态，所以会调用ReentrantLock的tryAcquire
+    //这个tryAcquire是不会操作同步队列的
     if (!tryAcquire(arg) &&
         //tryAcquire失败后，会调用addWaiter
         acquireQueued(addWaiter(Node.EXCLUSIVE), arg))
@@ -58,7 +59,7 @@ public final void acquire(int arg) {
 }
 ```
 
-`acquire`首先会调用`tryAcquire`再次加塞，根绝多态，最终会调用`NonFairSync.tryAcquire`，而`tryAcquire`又会调用`Sync.nonfairTryAcquire`，代码如下所示：
+`acquire`首先会调用`tryAcquire`再次加塞，根据多态，最终会调用`NonFairSync.tryAcquire`，而`tryAcquire`又会调用`Sync.nonfairTryAcquire`，`Sync.nonfairTryAcquire`实现了可重入的逻辑，并且给了线程最后加塞抢锁的机会，代码如下所示：
 
 ``` java
 //Sync中的nonfairTryAcquire
@@ -88,11 +89,11 @@ final boolean nonfairTryAcquire(int acquires) {
 }
 ```
 
-如果`tryAcquire`中的加塞操作都失败了，说明当前线程应该进入同步队列了，不然占着CPU又抢不到锁，不是浪费么。那么当前线程是如何入队的呢？请见下文。
+如果`tryAcquire`中的加塞操作失败了，说明当前线程应该进入同步队列了，不然占着CPU又抢不到锁，不是浪费么。那么当前线程是如何入队的呢？请见下文。
 
 ### 2.1 线程的入队操作
 
-在入队时，当前线程首先通过`addWaiter`进入同步队列,然后通过`accquireQueued`调整当前节点在队列的位置，这其中存在许多问题：
+在入队时，当前线程首先通过`addWaiter`进入同步队列,然后又调用了`accquireQueued`。这其中存在许多问题：
 
 1. `addWaiter`是怎么实现的？
 2. `accquireQueued`是干嘛的？
@@ -129,6 +130,7 @@ private Node addWaiter(Node mode) {
 }
 
 //enq只负责将当前node加入队列，并返回tail
+//并且enq会重新设置当前线程的prev指针
 private Node enq(final Node node) {
     for (;;) {
         Node t = tail;
@@ -152,6 +154,7 @@ private Node enq(final Node node) {
 ![addWaiter-cas](images/addWaiter-p1.drawio.svg)
 
 可以发现，如果设置tail不是原子操作,最后同步队列中threadA的node就会丢失，因为下一个节点只会接在tail节点的后面。并且pred的next有可能发生混乱，比如tail=nodeB，但是pred.next=nodeA。
+
 试想如下一个场景：threadA只设置了tail，还没设置pred.next时间片就用完了。threadB设置了tail和pred.next后，threadA再设置pred.next。结果如下所示：
 
 ![addWaiter-p2](images/addWaiter-p2.drawio.svg)
@@ -160,14 +163,9 @@ private Node enq(final Node node) {
 
 从上面的代码我们得出结论：**一旦一个节点成功的设置了tail指针，那么这个节点就算成功进入同步同列。**
 
-其实是因为`ReentrantLock`在获取锁时是不响应中断的，只会在获取锁后调用补上一个中断操作。如果`accquireQueued`返回true，则表示在获取锁的过程中发生了中断。那么线程是怎么进入同步队列的呢？我们看看`addWaiter`的代码：
-
 #### 2.2.1 `accquireQueued`是干嘛的？
 
-既然当前线程已经进入同步队列了，那么下一步就是将自己挂起，不然白白占着CPU，抢不到锁，什么也不能干。`accquireQueued()`就是用来将目标前程挂起的。但是被挂起之前需要做一些准备工作。准备工作包括：
-
-1. 在准备挂起之前，先尝试获取锁，,如果获取成功，则在**逻辑**上退出当前队列，并返回中断情况。如果获取失败，则执行2
-1. 调用`shouldParkAfterFailedAcquire`为当前线程的包装节点`node`找到一个合适的前置节点`pred`用来唤醒`node`。
+在线程进入同步队列后，它可能会执行的操作包括：线程获取锁并出队，或者线程抢不到锁并挂起，`accquireQueued()`就是用来实现这两个操作的。
 
 下面我们具体来分析一下代码：
 
@@ -189,7 +187,8 @@ final boolean acquireQueued(final Node node, int arg) {
                 return interrupted;
             }
             //线程在每次进入挂起之前，都会重新安排当前节点的前向节点
-            //如果前向节点cancel了的话，则需要重新找爹,只有前向节点pred的waitStatus为-1时，当前线程才会挂起
+            //如果前向节点cancel了的话，则需要重新找爹
+            //只有前向节点pred的waitStatus为-1时，当前线程才会挂起
             if (shouldParkAfterFailedAcquire(p, node) &&
                 parkAndCheckInterrupt())
                 //如果发生中断，则需要将interrupted设置为true，以便后续能够及时补一个中断操作
@@ -203,7 +202,11 @@ final boolean acquireQueued(final Node node, int arg) {
 }
 ```
 
-通过阅读上面的代码我们可以发现：如果node（当前处理的节点）的前向节点`pred`==`head`时，那么说明node前面没有人了，可以抢锁了。没人了还跟谁抢？当然是跟那些第一次来不遵守规则的人抢了。没抢到的话，就需要准备找爹然后挂起了，找爹是怎么完成的？看看`shouldParkAfterFailedAcquire`的具体代码：
+通过阅读上面的代码我们可以发现：如果`node`（当前处理的节点）的前向节点`pred`==`head`时，那么说明node前面没有人了，可以抢锁了。没人了还跟谁抢？当然是跟那些第一次来不遵守规则的人抢了。
+
+如果成功抢到锁，则在**逻辑**上退出当前队列，并返回中断情况。
+
+没抢到的话，就需要准备找爹（一个合适的前置节点）然后挂起了，但是被挂起之前需要做一些准备工作。准备工作包括：调用`shouldParkAfterFailedAcquire`为当前线程的包装节点`node`找到一个合适的前置节点`pred`用来唤醒`node`，**只有`node`的前向节点`pred`的waitStatus为-1时，才会被挂起来。** 分析一下具体的准备工作是如何完成的：
 
 ``` java
 private static boolean shouldParkAfterFailedAcquire(Node pred, Node node) {
@@ -235,7 +238,7 @@ private static boolean shouldParkAfterFailedAcquire(Node pred, Node node) {
         /***********************************************
         * 为什么设置状态要使用CAS操作？什么情况下会发生竞争？谁会修改pred的status？是pred自己吗？
         * pred的status需要靠后继节点来设置，如果它执行cancel操作后，status>0，但是如果还是执行pred.status=-1，cancel的状态丢失了
-        * 所以由于pred.ws==Node.SGNAL，pred会被唤醒获取锁，但是pred却不会执行获取锁的代码了，所以pred后面的节点即使唤醒永远无法跳过pred
+        * 所以由于pred.ws==Node.SGNAL，pred可能会被唤醒获取锁，但是pred却不会执行获取锁的代码了，所以pred后面的节点即使唤醒永远无法跳过pred
         * 所以需要使用CAS操作，避免cancel状态被覆盖
         ***********************************************/
         compareAndSetWaitStatus(pred, ws, Node.SIGNAL);
@@ -247,19 +250,39 @@ private static boolean shouldParkAfterFailedAcquire(Node pred, Node node) {
     }
     return false;
 }
-
 ```
 
 对`shouldParkAfterFailedAcquire`的基本流程总结如下：
 
 1. 如果node的前向节点pred的`waitStatus == -1`，说明爹已经找好了，安心地睡觉了，到时候有人会叫
-2. 如果node的前向节点pred的`waitStatus >0 `，说明前面的人不可靠，需要从pred开始向前遍历，找一个可靠的爹
-3. 如果node的前向节点pred的`waitStatus <=0 `,如果能成功设置pred.waitStatus==-1,说明爹已经找好了，否则返回false，等待下次进入该函数找爹
+2. 如果node的前向节点pred的`waitStatus > 0`，说明前面的人不可靠，需要从pred开始向前遍历，找一个可靠的爹
+3. 如果node的前向节点pred的`waitStatus <= 0`,如果能成功设置pred.waitStatus==-1,说明爹已经找好了，否则返回false，等待下次进入该函数找爹
 
-`shouldParkAfterFailedAcquire`只有在确保前一个节点状态为-1时，才会返回true挂起当前线程。否则返回false，需要一直继续找个好爹。
+`shouldParkAfterFailedAcquire`**只有在确保前一个节点状态为-1时，才会返回true挂起当前线程**。否则返回false，需要一直继续找个好爹。
 
-上面描述了一个节点从入队到挂起等待的全过程。但是如果有的节点不想等了呢？能直接退出同步队列吗？当前，这个操作由`acquireQueued.cancelAcquire`完成。
-这个cancel操作的实现比较复杂，需要认真梳理一下代码：
+上面描述了一个节点从入队到挂起等待的全过程。但是如果有的节点不想等了呢？能直接退出同步队列吗？当前，这个操作由`acquireQueued.cancelAcquire`完成。但是这个方法是如何被调用的？`acquireQueued`中完全没有抛出异常的代码。其实真正能够抛出异常的地方就是由用户重写的方法`tryAcquire`,用户是可能抛出异常的,抛出后，会执行`cancelAcquire`，并且抛出的异常会层层上传到调用`ReentrantLock.lock()`的地方，此时用户可以处理自己抛出的异常。抛出的代码如下：
+
+``` java
+final boolean acquireQueued(final Node node, int arg) {
+    boolean failed = true;
+    try {
+        boolean interrupted = false;
+        for (;;) {
+            ...
+            //可能抛出异常的地方
+            if (p == head && tryAcquire(arg)) {
+            ...
+            }
+        }
+    } finally {
+        //如果没有获取到锁，并且取消了请求，那么就要执行取消操作
+        if (failed)
+            cancelAcquire(node);
+    }
+}
+```
+
+在了解了什么时候调用`cancelAcquire`，我们需要看看这个cancel操作到底是如何实现的，其实现代码如下：
 
 ``` java
 //cancel的节点一直存在,直到后面的节点在挂起前，执行了shouldParkAfterFailedAcquire，设置prev后，cancel的节点就会不可达了
@@ -358,14 +381,13 @@ private void cancelAcquire(Node node) {
 2. `node`为头节点`head`的后继节点
 3. `node`在中间，既不为`tail`，也不为`head`
 
-对于三种情况的取消操作，只有后两种情形需要执行唤醒后继节点的操作。why？这里先不做解释，具体请看`Q2`的问题答疑。而且我存在三个疑问，具体问题位置，我在代码中进行了标注。但是在解决疑问之前，我们需要知道一个基本事实：
+对于三种情况的取消操作，只有后两种情形会执行唤醒后继节点的操作。why？这里先不做解释，具体请看`Q2`的问题答疑。对于我存在三个疑问，具体位置我已在代码中进行了标注。但是在解决疑问之前，我们需要知道一个基本事实：
 
 >如果一个节点已经cancel了，那么这个节点表示的线程即使唤醒了，也不会执行获取锁的操作。因为当前执行的代码早就有可能执行到别的地方，而不是停留在获取锁的地方。
 
-了解了基本事实后，我讲讲我对每个问题的答案。
+了解了基本事实后，我讲讲我对每个问题的理解。
 
 ---
-
 **Question 1：既然代码中problem1处，的CAS成功与否并不重要，那么为什么要使用CAS？**
 
 ---
@@ -387,20 +409,20 @@ private void cancelAcquire(Node node) {
 
 ![cancelAcquire-p7](images/cancelAcquire-p7.drawio.svg)
 
-当nodeA_pred释放锁后，它需要唤醒下一个节点，`nodeA_pred.next=null`。所以就需要从尾部`tail`开始向前遍历同步队列。当队列很长时，这种遍历是耗时的，但是这种情况可以通过CAS避免。达到了快速找到下一个唤醒线程的目标。
+当nodeA_pred释放锁后，它需要唤醒下一个节点，`nodeA_pred.next=null`。所以就需要从尾部`tail`开始向前遍历同步队列。当队列很长时，这种遍历是耗时的，但是这种情况可以通过CAS避免，达到了快速找到下一个唤醒线程的目标。
 
 ---
 **Question 2：为什么代码中problem2处要设置如此的判断条件？**
 
 ---
 
-试想当我们取消一个节点获取锁时，有必要唤醒当前被取消节点的后继节点，因为后继节点的唤醒是由当前被取消的节点负责的，但是并不是所有的情况都需要唤醒的。假设我们当前取消的节点为`node`，其前向节点为`pred`：
+试想当我们取消一个节点获取锁时，有必要唤醒（通过`unparkSuccessor`完成，在第3节中分析）当前被取消节点的后继节点，因为后继节点的唤醒是由当前被取消的节点负责的，但是并不是所有的情况都需要唤醒的。假设我们当前取消的节点为`node`，其前向节点为`pred`：
 
 1. 当`node`为尾节点tail时，并且在当前线程更新`tail`前，没有新节点入队，那么就不用执行唤醒操作（如果在当前线程更新`tail`后，有新节点A入队，那么A在挂起前会找到一个可靠的前向节点B，A的唤醒由B管理，而不是由`node`管理）。否则执行2或者3。
 
 2. 当`pred`为头节点`head`时，必须唤醒`node`的后继节点。这个逻辑很容易理解。假设当前`pred`释放锁了，它会唤醒`node`，而`node`此时已经取消了，代码早就跑飞了，唤醒了`node`有什么用？`node`不抢锁了，自然不会唤醒`node`的后继节点。
 
-3. 当`node`为非尾节点时，并且`node`的前一个节点状态不为-1并且不能更新为-1时，那么就必须手动唤醒`node`之后的第一个有效节点。这是因为`pred`必须为一个有效节点，否则即使设置了`pred.next`，`node`的后继节点也可能会永远无法被唤醒。可能这个逻辑比较难理解。我试图从以下几张图说说我的理解。
+3. 当`node`为非尾节点时，并且`node`的前一个节点状态不为-1并且不能更新为-1时，那么就必须手动唤醒`node`之后的第一个有效节点。这是因为`pred`必须为一个有效节点，否则即使设置了`pred.next`，`node`的后继节点也可能会永远无法被唤醒。可能这个逻辑比较难理解。我试图结合以下几张图说说我的理解。
 
 如果没有第3点的条件限制，也就是说实际的代码如下：
 
@@ -431,7 +453,9 @@ if (pred != head) {
 那么为什么有了`((ws = pred.waitStatus) == Node.SIGNAL ||
 (ws <= 0 && compareAndSetWaitStatus(pred, ws, Node.SIGNAL))`，就能够避免上述的情况？
 
-试想，如果`node`在取消时，发现其前向节点`pred`也在取消，也就是`ws!=Node.SIGNAL`或者CAS失败，就会直接手动唤醒`node`的后继线程，而后继线程在重新挂起前又会找到一个可靠的前向节点，所以保证了唤醒链不会中断。
+**因为了该条件保证前向节点`pred`的有效性。**
+
+试想，如果`node`在取消时，发现`ws!=Node.SIGNAL`或者CAS失败，这就说明`pred`不可靠了，需要手动唤醒`node`的后继线程，让这些后继线程在重新挂起前重新找个好爹，所以保证了唤醒链不会中断。
 
 那么在`node`取消后，`pred`再取消为什么不会有问题呢？这就很简单了，原理如下图所示：
 
@@ -439,7 +463,7 @@ if (pred != head) {
 
 **小结：**
 
-对于被取消的节点，如果在完成取消操作前，后续有节点需要被唤醒，那么必须保证它前面有一个`waitstatus == -1`的节点。
+对于被取消的节点`node`，如果在完成取消操作前，`node`后续有节点，那么必须保证`node`前面有一个`waitstatus == -1`的节点用来完成唤醒`node`之后的线程。
 
 ---
 
@@ -448,6 +472,7 @@ if (pred != head) {
 ---
 
 我的理解是：使用CAS能够避免唤醒链的中断。
+
 试想如下一种场景：threadA正在取消节点，正准备执行`compareAndSetNext(pred, predNext, next);`时切换threadB。threadB排在threadA后面。恰巧threadB也在取消节点，并且取消的是尾节点tail，取消完成后状态如下所示：
 
 ![cancelAcquire-p8](images/cancelAcquire-p8.drawio.svg)
@@ -459,11 +484,12 @@ if (pred != head) {
 那么在`nodeA_pred`释放锁后，唤醒的线程是`nodeB`，但是`nodeB`已经取消了，唤醒它有什么用呢？后面新入队的节点再也不会被唤醒。导致唤醒链中断。
 
 **小结**
-如果被取消节点`node`的前向节点`pred`的next指针设置失败时，就说明`node`的直系后继节点`next`可能已经失效了，自然不能执行`pred.next=node.next`（这个操作由CAS来保证）。
+如果被取消节点`node`的前向节点`pred`的next指针设置失败时，就说明`node`的直系后继节点`next`可能已经失效了，**因为`pred`的next指针只会被`node`的后继节点更改。** 自然不能执行`pred.next=node.next`（这个操作由CAS来保证）。
 
 #### 2.1.3 `selfInterrupt`是干嘛的？
 
 简单点来说，`selfInterrupt`是用来补偿中断的。为何要补偿？因为`ReentrantLock`在获取锁时，即使产生了中断，也不会退出获取锁的流程。那么中断在哪里产生？
+见下面代码：
 
 ``` java
 private final boolean parkAndCheckInterrupt() {
@@ -471,6 +497,8 @@ private final boolean parkAndCheckInterrupt() {
     return Thread.interrupted();
 }
 ```
+
+在线程被挂起后，要么被`unpark`唤醒，要么被中断唤醒。唤醒之后会调用`Thread.interrupted`返回当前中断状态（用来判断当前线程被唤醒的原因是什么）。如果是由于中断唤醒的，那么`interrupted`会被设置为true，具体实现在`acquireQueued`中：
 
 ``` java
 final boolean acquireQueued(final Node node, int arg) {
@@ -496,10 +524,11 @@ final boolean acquireQueued(final Node node, int arg) {
 }
 ```
 
+在`acquireQueued`正常返回后，会返回`interrupted`，如果该变量为`true`，则会调用`selfInterrupt`手动实现一个中断，补偿在获取锁过程中产生的未响应中断。
 
 ## 3. ReentrantLock的释放操作
 
-锁的释放还是需要借助框架实现，首先会调用`AbstractQueuedSynchronizer.release`,代码如下：
+锁的释放还是需要借助AQS框架实现，首先会调用`AbstractQueuedSynchronizer.release`,代码如下：
 
 ``` java
 public final boolean release(int arg) {
@@ -516,13 +545,12 @@ public final boolean release(int arg) {
 }
 ```
 
-当锁没有被线程持有时，就可以唤醒头节点head之后的节点了。但是唤醒的判断条件为什么是h != null && h.waitStatus != 0？
+当锁没有被线程持有时，就可以唤醒头节点head之后的节点了。但是唤醒的判断条件为什么是h != null && h.waitStatus != 0？原因有两点：
 
 1. h == null Head还没初始化。初始情况下，head == null，第一个节点入队，Head会被初始化一个虚拟节点。所以说，这里如果还没来得及入队，就会出现head == null 的情况。
-2. h != null && waitStatus == 0 表明后继节点对应的线程仍在运行中，不需要唤醒。
-3. h != null && waitStatus < 0 表明后继节点可能被阻塞了，需要唤醒。
+2. h != null && waitStatus == 0 表明后继节点对应的线程仍在运行中，不需要唤醒；h != null && waitStatus < 0 表明后继节点可能被阻塞了，需要唤醒。
 
-再看一下unparkSuccessor方法：
+那么释放锁唤醒线程的操作由`unparkSuccessor`完成：
 
 ``` java
 // java.util.concurrent.locks.AbstractQueuedSynchronizer
@@ -570,3 +598,9 @@ private Node addWaiter(Node mode) {
 ```
 
 我们从这里可以看到，节点入队并不是原子操作，也就是说，node.prev = pred; compareAndSetTail(pred, node) 这两个地方可以看作Tail入队的原子操作，但是此时pred.next = node;还没执行，如果这个时候执行了unparkSuccessor方法，就没办法从前往后找了，所以需要从后往前找。还有一点原因，在产生CANCELLED状态节点的时候，先断开的是Next指针，Prev指针并未断开，因此也是必须要从后往前遍历才能够遍历完全部的Node。
+
+## 参考文献
+
+1. [AQS源码详细解读](https://zhuanlan.zhihu.com/p/122186071)
+
+2. [从ReentrantLock的实现看AQS的原理及应用](https://tech.meituan.com/2019/12/05/aqs-theory-and-apply.html#:~:text=AQS%E6%A0%B8%E5%BF%83%E6%80%9D%E6%83%B3%E6%98%AF%EF%BC%8C%E5%A6%82%E6%9E%9C,%E7%BA%BF%E7%A8%8B%E5%8A%A0%E5%85%A5%E5%88%B0%E9%98%9F%E5%88%97%E4%B8%AD%E3%80%82)
