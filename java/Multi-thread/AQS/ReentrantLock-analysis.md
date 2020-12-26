@@ -254,11 +254,11 @@ private static boolean shouldParkAfterFailedAcquire(Node pred, Node node) {
 
 对`shouldParkAfterFailedAcquire`的基本流程总结如下：
 
-1. 如果node的前向节点pred的`waitStatus == -1`，说明爹已经找好了，安心地睡觉了，到时候有人会叫
+1. 如果node的前向节点pred的`waitStatus == -1`，说明爹已经找好了，安心地睡觉了，到时候有人会叫。
 2. 如果node的前向节点pred的`waitStatus > 0`，说明前面的人不可靠，需要从pred开始向前遍历，找一个可靠的爹
 3. 如果node的前向节点pred的`waitStatus <= 0`,如果能成功设置pred.waitStatus==-1,说明爹已经找好了，否则返回false，等待下次进入该函数找爹
 
-`shouldParkAfterFailedAcquire`**只有在确保前一个节点状态为-1时，才会返回true挂起当前线程**。否则返回false，需要一直继续找个好爹。
+`shouldParkAfterFailedAcquire`**只有在确保前一个节点状态为-1时，才会返回true挂起当前线程**。否则返回false，需要一直继续找个好爹。因为如果当前节点的前向节点`pred`执行了取消动作，就是靠`pred.waitStatus`是否为`-1`判断`pred`后面是否有线程挂起。这也就是为什么线程在挂起时必须保证`pred-waitStauts == -1`。
 
 上面描述了一个节点从入队到挂起等待的全过程。但是如果有的节点不想等了呢？能直接退出同步队列吗？当前，这个操作由`acquireQueued.cancelAcquire`完成。但是这个方法是如何被调用的？`acquireQueued`中完全没有抛出异常的代码。其实真正能够抛出异常的地方就是由用户重写的方法`tryAcquire`,用户是可能在这个方法中抛出异常的,抛出后，会执行`cancelAcquire`，并且抛出的异常会层层上传到调用`ReentrantLock.lock()`的地方，此时用户可以处理自己抛出的异常。抛出的代码如下：
 
