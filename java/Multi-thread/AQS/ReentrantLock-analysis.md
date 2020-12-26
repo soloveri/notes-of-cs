@@ -260,7 +260,7 @@ private static boolean shouldParkAfterFailedAcquire(Node pred, Node node) {
 
 `shouldParkAfterFailedAcquire`**只有在确保前一个节点状态为-1时，才会返回true挂起当前线程**。否则返回false，需要一直继续找个好爹。
 
-上面描述了一个节点从入队到挂起等待的全过程。但是如果有的节点不想等了呢？能直接退出同步队列吗？当前，这个操作由`acquireQueued.cancelAcquire`完成。但是这个方法是如何被调用的？`acquireQueued`中完全没有抛出异常的代码。其实真正能够抛出异常的地方就是由用户重写的方法`tryAcquire`,用户是可能抛出异常的,抛出后，会执行`cancelAcquire`，并且抛出的异常会层层上传到调用`ReentrantLock.lock()`的地方，此时用户可以处理自己抛出的异常。抛出的代码如下：
+上面描述了一个节点从入队到挂起等待的全过程。但是如果有的节点不想等了呢？能直接退出同步队列吗？当前，这个操作由`acquireQueued.cancelAcquire`完成。但是这个方法是如何被调用的？`acquireQueued`中完全没有抛出异常的代码。其实真正能够抛出异常的地方就是由用户重写的方法`tryAcquire`,用户是可能在这个方法中抛出异常的,抛出后，会执行`cancelAcquire`，并且抛出的异常会层层上传到调用`ReentrantLock.lock()`的地方，此时用户可以处理自己抛出的异常。抛出的代码如下：
 
 ``` java
 final boolean acquireQueued(final Node node, int arg) {
@@ -547,8 +547,8 @@ public final boolean release(int arg) {
 
 当锁没有被线程持有时，就可以唤醒头节点head之后的节点了。但是唤醒的判断条件为什么是h != null && h.waitStatus != 0？原因有两点：
 
-1. h == null Head还没初始化。初始情况下，head == null，第一个节点入队，Head会被初始化一个虚拟节点。所以说，这里如果还没来得及入队，就会出现head == null 的情况。
-2. h != null && waitStatus == 0 表明后继节点对应的线程仍在运行中，不需要唤醒；h != null && waitStatus < 0 表明后继节点可能被阻塞了，需要唤醒。
+1. h == null 说明head还没初始化。初始情况下，head == null，第一个节点入队，Head会被初始化一个虚拟节点。所以说，这里如果还没来得及入队，就会出现head == null 的情况。
+2. h != null && waitStatus == 0 表明后继节点对应的线程仍在运行中，不需要唤醒。因为只有当前节点的waitStatus== -1，后继线程才会挂起。h != null && waitStatus < 0 表明后继节点可能被阻塞了，需要唤醒。
 
 那么释放锁唤醒线程的操作由`unparkSuccessor`完成：
 
@@ -556,9 +556,13 @@ public final boolean release(int arg) {
 // java.util.concurrent.locks.AbstractQueuedSynchronizer
 
 private void unparkSuccessor(Node node) {
-    // 获取头结点waitStatus
+    // 获取当前结点waitStatus
     int ws = node.waitStatus;
     if (ws < 0)
+        /***********************************
+        * 这个if操作完全是给head节点用的，
+        * 使用CAS我认为是为了防止有的线程多一次获取锁的机会，避免覆盖别的线程操作结果
+        /**********************************/
         compareAndSetWaitStatus(node, ws, 0);
     // 获取当前节点的下一个节点
     Node s = node.next;
@@ -570,7 +574,7 @@ private void unparkSuccessor(Node node) {
             if (t.waitStatus <= 0)
                 s = t;
     }
-    // 如果当前节点的下个节点不为空，而且状态<=0，就把当前节点unpark
+    // 如果当前节点的下个节点不为空，而且状态<=0，就把下个节点unpark
     if (s != null)
         LockSupport.unpark(s.thread);
 }
@@ -599,8 +603,14 @@ private Node addWaiter(Node mode) {
 
 我们从这里可以看到，节点入队并不是原子操作，也就是说，node.prev = pred; compareAndSetTail(pred, node) 这两个地方可以看作Tail入队的原子操作，但是此时pred.next = node;还没执行，如果这个时候执行了unparkSuccessor方法，就没办法从前往后找了，所以需要从后往前找。还有一点原因，在产生CANCELLED状态节点的时候，先断开的是Next指针，Prev指针并未断开，因此也是必须要从后往前遍历才能够遍历完全部的Node。
 
+## 4. 总结
+
+`ReentrantLock`是独占锁的经典实现。
+
 ## 参考文献
 
 1. [AQS源码详细解读](https://zhuanlan.zhihu.com/p/122186071)
 
 2. [从ReentrantLock的实现看AQS的原理及应用](https://tech.meituan.com/2019/12/05/aqs-theory-and-apply.html#:~:text=AQS%E6%A0%B8%E5%BF%83%E6%80%9D%E6%83%B3%E6%98%AF%EF%BC%8C%E5%A6%82%E6%9E%9C,%E7%BA%BF%E7%A8%8B%E5%8A%A0%E5%85%A5%E5%88%B0%E9%98%9F%E5%88%97%E4%B8%AD%E3%80%82)
+
+3. [AbstractQueuedSynchronizer 原理分析 - 独占/共享模式](https://www.tianxiaobo.com/2018/05/01/AbstractQueuedSynchronizer-%E5%8E%9F%E7%90%86%E5%88%86%E6%9E%90-%E7%8B%AC%E5%8D%A0-%E5%85%B1%E4%BA%AB%E6%A8%A1%E5%BC%8F/#421-%E8%8E%B7%E5%8F%96%E5%90%8C%E6%AD%A5%E7%8A%B6%E6%80%81)
