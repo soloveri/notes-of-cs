@@ -100,11 +100,13 @@ private void setHeadAndPropagate(Node node, int propagate) {
 2. h == null 或者 (h = head) == null
 3. h.waitStatus < 0
 
-其中，第一个条件很正常，当`propagate`的返回值大于0时，说明后继线程如果被唤醒，那么它们有概率获得锁。但是第二个条件我实在是无法理解，在进入`setHeadAndPropagate`函数之前，一定会调用`addWaiter`初始化同步队列，所以h不可能为空。对于最后一个条件，`h.waitStatus<0`说明后继线程被挂起了，所以不会出现执行唤醒动作而没有需要唤醒的线程。
+其中，第一个条件很正常，当`propagate`的返回值大于0时，说明后继线程如果被唤醒，那么它们有概率获得锁。但是第二个条件我实在是无法理解，在进入`setHeadAndPropagate`函数之前，一定会调用`addWaiter`初始化同步队列，所以h不可能为空，这里为什么需要进行多余的判空操作？对于最后一个条件，`h.waitStatus<0`说明存在后继线程被挂起的情况。
 
-假设检查通过，会执行`doReleaseShared`用来唤醒后继线程。这个方法可以说是共享锁的核心，而且它也会在线程释放共享锁时调用。为什么需要这么做？对于释放锁后调用此方法是可以理解的，不然同步队列的线程怎么获取锁呢？但是当线程获取锁后，还调用此方法，是因为**共享锁**希望能够被尽可能多的线程持有。当一个线程获取成功后，它有责任让更多的后继来尝试。`doReleaseShared`会被调用两次的原因解释清楚了，具体的分析请见共享锁的释放一章。
+假设检查通过，会执行`doReleaseShared`用来唤醒后继线程。这个方法可以说是共享锁的核心，而且它也会在线程释放共享锁时调用，总共会在两个位置被调用。为什么需要这么做？对于释放锁后调用此方法是可以理解的，不然同步队列的线程怎么获取锁呢？但是当线程获取锁后，还调用此方法，是因为**共享锁**希望能够被尽可能多的线程持有。当一个线程获取成功后，它有责任让更多的后继来尝试。`doReleaseShared`会被调用两次的原因解释清楚了，具体的分析请见共享锁的释放一章。
 
 ## 2.共享锁的释放
+
+首先当共享锁释放时，会调用AQS的`releaseShared`方法。在`releaseShared`中会首先调用用户自定义的释放锁方法`tryReleaseShared`，`releaseShared`实现代码如下：
 
 ``` java
 public final boolean releaseShared(int arg) {
@@ -115,8 +117,9 @@ public final boolean releaseShared(int arg) {
     }
     return false;
 }
-
 ```
+
+如果锁释放成功，则会调用`doReleaseShared`唤醒当前节点的后继线程：
 
 ``` java
 private void doReleaseShared() {
@@ -152,7 +155,7 @@ private void doReleaseShared() {
 }
 ```
 
-`doReleaseShared`这个函数用来唤醒尽可能多地后继线程。为什么要这么做呢？因为这是共享锁，当一个线程获取锁成功后，后继线程有概率成功获得锁，那么这个唤醒动作什么时候终止呢？答案是：直到没有线程成功锁为止。这个操作如何实现？就是通过下面的代码：
+`doReleaseShared`这个函数用来唤醒尽可能多的处于同步队列的后继线程，为什么要这么做呢？因为这是共享锁，当一个线程获取锁成功后，不必等到当前线程释放后才让后继线程来抢锁，可以让后继线程和当前线程共同使用锁嘛。那么这个唤醒动作什么时候终止呢？答案是：直到没有线程成功锁为止。这个操作如何实现？就是通过下面的代码：
 
 ``` java
 for (;;) {
@@ -186,13 +189,29 @@ for (;;) {
 }
 ```
 
-对于代码中的第一个`if`条件：`(h != null && h != tail)`，说明需要同步队列中除head之外，必须还存在一个节点。不然唤醒谁呢？
+上面代码中的四处if条件我们需要好好理解一下。
 
-对于第二个`if`条件：`(ws == Node.SIGNAL)`，这个条件的含义是只有`head.waitStatus == -1`，才表示后续节点被挂起。具体的挂起操作见`shouldParkAfterFailedAcquire`函数。
+对于代码中的**第一个**`if`条件：`(h != null && h != tail)`，说明需要同步队列中除head之外，必须还存在一个节点。不然唤醒谁呢？
 
-对于第三个`if`条件：`(!compareAndSetWaitStatus(h, Node.SIGNAL, 0))`，这里使用CAS执行`head.waitStatus=0`是为了防止多个线程多次唤醒同一个head之后的后继节点。这里为什么会有多个线程唤醒同一个head的后继节点？这就跟共享模式的唤醒机制有关了。
+对于**第二个**`if`条件：`(ws == Node.SIGNAL)`，这个条件的含义是只有`head.waitStatus == -1`，才表示后续节点被挂起。具体的挂起操作见`shouldParkAfterFailedAcquire`函数。
 
-对于第四个`if`条件：`(ws == 0 && !compareAndSetWaitStatus(h, 0, Node.PROPAGATE))`
+对于**第三个**`if`条件：`(!compareAndSetWaitStatus(h, Node.SIGNAL, 0))`，这里使用CAS执行`head.waitStatus=0`是为了防止多个线程多次唤醒同一个head之后的后继节点。这里为什么会有多个线程唤醒同一个head的后继节点？这就跟共享模式的唤醒机制有关了。假设现在同步队列如下：
+
+![doReleaseShared](images/doReleaseShared-p1.drawio.svg)
+
+当节点A出队后，在调用`doReleaseShared`时，发现同步队列中还有节点，那么当A成功执行`!compareAndSetWaitStatus(h, Node.SIGNAL, 0)`后，执行`unparkSuccessor`唤醒节点B，此时节点A开始了下一次循环。
+
+现在假设节点B也成功获取了锁，也进入了`doReleaseShared`,此时同步队列状态如下所示：
+
+![doReleaseShared](images/doReleaseShared-p2.drawio.svg)
+
+此时线程A和线程B操作的可能是同一个head。假设A唤醒B，B成功获得锁，改变了head，A会再次进入`doReleaseShared`，并且B也会因为成功获得锁首次调用`doReleaseShared`，那么A和B操作的就是同一个head，而唤醒C只需要做一次，CAS来保证这个“一次”。
+
+对于**第四个**`if`条件：`(ws == 0 && !compareAndSetWaitStatus(h, 0, Node.PROPAGATE))`，这也可能是为了性能的极致优化。首先我们需要需要知道能够走到这个条件的状态是同步队列中必须有两个节点。
+
+如果`ws==0`为true，则说明此时同步队列中有可能所有的节点都没有挂起。或者原来的尾节点tail成为了新的头节点head。因为`ws == 0`只有可能是这两种情况。而`compareAndSetWaitStatus(h, 0, Node.PROPAGATE)`失败则说明头节点head的状态被另外的线程的改变了。谁有资格改head的`waitStatus`？只有一种情况：那就是后继节点挂起了，才会将前置节点的`waitStatus`设置为-1。所以这个if完全就是为了处理这种极端并发。当后继线程挂起了，而后继线程又有资格获取锁，那么应该当前线程应该继续唤醒后继线程。所以
+
+
 
 ``` java
 public final boolean releaseShared(int arg) {
