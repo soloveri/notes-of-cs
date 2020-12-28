@@ -471,9 +471,9 @@ if (pred != head) {
 
 ---
 
-我的理解是：使用CAS能够避免唤醒链的中断。
+我的理解是：使用CAS能够加速查找下一个唤醒目标。
 
-试想如下一种场景：threadA正在取消节点，正准备执行`compareAndSetNext(pred, predNext, next);`时切换threadB。threadB排在threadA后面。恰巧threadB也在取消节点，并且取消的是尾节点tail，取消完成后状态如下所示：
+试想如下一种场景：threadA正在取消节点，正准备执行`compareAndSetNext(pred, predNext, next);`时切换threadB。threadB排在threadA后面。恰巧threadB也在取消节点，并且取消的是尾节点tail，取消**完成**后状态如下所示：
 
 ![cancelAcquire-p8](images/cancelAcquire-p8.drawio.svg)
 
@@ -481,7 +481,7 @@ if (pred != head) {
 
 ![cancelAcquire-p9](images/cancelAcquire-p9.drawio.svg)
 
-那么在`nodeA_pred`释放锁后，唤醒的线程是`nodeB`，但是`nodeB`已经取消了，唤醒它有什么用呢？后面新入队的节点再也不会被唤醒。导致唤醒链中断。
+那么在`nodeA_pred`释放锁后，唤醒的线程是`nodeB`，但是`nodeB`已经取消了，必须从尾部开始向前遍历，直到找到一个可用的节点。
 
 **小结**
 如果被取消节点`node`的前向节点`pred`的next指针设置失败时，就说明`node`的直系后继节点`next`可能已经失效了，**因为`pred`的next指针只会被`node`的后继节点更改。** 自然不能执行`pred.next=node.next`（这个操作由CAS来保证）。
