@@ -124,7 +124,6 @@ class ObjectMonitor {
 
 那么监视对象、监视锁、线程的关系是：监视对象内存存储了监视锁，而监视锁中又存储了获得当前锁的线程。并且由于每个对象都会有对象头，而对象头中自带监视锁，所以Java中任何一个对象都可以用作监视对象，所以`wait()`、`notify()`等方法在顶级父类`Object`中实现。
 
-
 # 3. Java1.6后的synchronized
 
 因为Java的线程模型采用的是1:1模型，一个Java线程映射到系统的一个线程，所以Java线程的切换、阻塞、唤醒都需要在内核模式中完成，频繁地切换用户模式与内核模式代价非常高（所以`synchronzied`被称为重锁）。那么如果同步区非常短，执行同步区的时间比切换内核模式的时间还短，程序的效率就比较低了。所以在Java1.6之后，`synchronzied`进行了大量优化。对于`synchronized`，不会再一开始就使用`objectMonitor`完成同步。而是根据线程对锁的竞争程度不断升级获取锁的难度。
@@ -139,12 +138,11 @@ class ObjectMonitor {
 ![lock record](images/lock-record.png)
 
 其中：
+
 - `displaced hdr(displaced markword)`:一般用来保存`monitor object`对象头中的`markword`信息副本
 - `owner`：指向`monitor object`的指针。
 
 在后三种锁状态中，都会使用`Lock Record`。但是在偏向锁状态中并不会使用`Lock Record`的`displaced markword`。
-
-
 
 ## 3.1 偏向锁
 
@@ -153,8 +151,7 @@ class ObjectMonitor {
 >注意：“偏向第一个获得该锁的线程”并不是指在偏向锁的生命周期内只会有一个线程获得锁。
 比如在最开始，threadA获得了偏向锁lock，此时lock偏向threadA。使用完毕后，threadB请求lock。虽然lock发现此时请求的线程不是threadA，但是由于此时没有发生竞争，所以lock重新设置其偏向的线程为threadB。**而不是说从头到尾lock都只偏向threadA。**
 
-偏向锁的使用场景是同步区只被同一个线程访问。那么在使用偏向锁时**只会在第一次**申请时使用CAS将`markword`中的线程ID（默认为0，表示匿名偏向状态）替换为当前获得锁的线程ID（当然如果不停地出现新线程成功获取锁的情况，那么每次新线程都会使用CAS替换ThreadID）。但是并不是简单的替换而已，JVM同时也会在当前线程的`Lock Record`列表中插入一个`Lock Record`结构。
-
+ 偏向锁的使用场景是同步区只被同一个线程访问。那么在使用偏向锁时~~只会在第一次申请时~~，使用CAS将`markword`中的线程ID（默认为0，表示匿名偏向状态）替换为当前获得锁的线程ID（当然如果不停地出现新线程成功获取锁的情况，那么每次新线程都会使用CAS替换ThreadID。但是并不是简单的替换而已，JVM同时也会在当前线程的`Lock Record`列表中插入一个`Lock Record`结构。
 
 ### 3.1.1 偏向锁的获取流程
 
@@ -331,7 +328,7 @@ CASE(_monitorenter): {
 
 对于偏向锁获取流程中第（8）步的判断，其执行的检查十分复杂，调用链如下：
 
-InterpreterRuntime::monitorenter --> ObjectSynchronizer::fast_enter --> BiasedLocking::revoke_and_rebias --> BiasedLocking::revoke_bias
+InterpreterRuntime::monitorenter --> ObjectSynchronizer::fast_enter --> BiasedLocking::revoke_and_rebias --> (safepoint调用)BiasedLocking::revoke_bias
 
 我们着重分析`revoke_and_rebias`与`revoke_bias`
 
@@ -409,11 +406,13 @@ static BiasedLocking::Condition revoke_bias(oop obj, bool allow_rebias, bool is_
       ...
     }
   }
-  if (highest_lock != NULL) { // highest_lock 如果非空，则它是最早关联该锁的 lock record
+  if (highest_lock != NULL) { 
+    // highest_lock 如果非空，则它是最早关联该锁的 lock record
     // 这个 lock record 是线程彻底退出该锁的最后一个 lock record
-    // 所以要，设置 lock record 的 displaced mark word 为无锁状态的 mark word
-    // 并让锁对象的 mark word 指向当前 lock record
+  
+    //关闭偏向模式，这样后面的线程再次抢锁时直接走轻量锁流程
     highest_lock->set_displaced_header(unbiased_prototype);
+    //设置锁对象的markword指向displaced header
     obj->release_set_mark(markOopDesc::encode(highest_lock));
     ...
   } else {
@@ -502,7 +501,7 @@ CASE(_monitorexit): {
 
 >所以我个人认为，批量重偏向只适用于那些没有被统一修改epoch字段的锁对象
 
-下面代码片段是对批量偏向和批量撤销前的阈值判断。
+具体的函数调用链为：InterpreterRuntime::monitorenter --> ObjectSynchronizer::fast_enter --> BiasedLocking::revoke_and_rebias -->update_heuristics。下面代码片段是对批量偏向和批量撤销前的阈值判断。
 
 ``` java
 static HeuristicsResult update_heuristics(oop o, bool allow_rebias) {
@@ -560,7 +559,6 @@ static HeuristicsResult update_heuristics(oop o, bool allow_rebias) {
 }
 
 ```
-
 
 ## 3.2 轻量锁
 
@@ -672,16 +670,18 @@ CASE(_monitorenter): {
     }
 
     /*****************************************************/
-    // 走到这里说明偏向的不是当前线程或没有开启偏向锁等原因
+    // 走到这里说明没有开启偏向锁等原因
     if (!success) {
       // 轻量级锁逻辑 start
       // 构造无锁状态 Mark Word 的 copy(Displaced Mark Word)
       // 注意displaced markword是无锁状态!无锁状态!无锁状态！
       markOop displaced = lockee->mark()->set_unlocked();
-      // 将锁记录空间(Lock Record)指向Displaced Mark Word
+      // 将锁记录空间(Lock Record)的Displaced Mark Word设为无锁状态markword
       entry->lock()->set_displaced_header(displaced);
       // 是否禁用偏向锁和轻量级锁
       bool call_vm = UseHeavyMonitors;
+      // exchange ,addr,compare
+      //return compare value
       if (call_vm || Atomic::cmpxchg_ptr(entry, lockee->mark_addr(), displaced) != displaced) {
         // 判断是不是锁重入，是的话把Displaced Mark Word设置为null来表示重入
         // 置null的原因是因为要记录重入次数，但是mark word大小有限，所以每次重入都在栈帧中新增一个Displaced Mark Word为null的记录
@@ -715,6 +715,8 @@ CASE(_monitorenter): {
 
 我阅读了很久的源码，都没有发现设置的地方，网上有人说是通过[字节填充对齐来解决的](https://github.com/farmerjohngit/myblog/issues/14)。然而我不是很懂。
 
+也就是说：执行`Atomic::cmpxchg_ptr(entry, lockee->mark_addr(), displaced)`时，entry是一个四字节的指针，由于对齐操作，entry的第31~32bit一定为`00`，如果CAS成功，那么锁对象头的`markword`就指向了栈中的`Lock Record`。
+
 **Q2：在轻量锁状态时，CAS算法如何保证锁互斥的获取？**
 
 首先，我们看看核心代码：
@@ -722,7 +724,7 @@ CASE(_monitorenter): {
 ``` java
     //code1
     markOop displaced = lockee->mark()->set_unlocked();
-    // 将锁记录空间(Lock Record)指向Displaced Mark Word
+    //
     entry->lock()->set_displaced_header(displaced);
     // 是否禁用偏向锁和轻量级锁
     bool call_vm = UseHeavyMonitors;
@@ -745,12 +747,11 @@ markOop set_unlocked() const {
 }
 ```
 
-`lock`就是当前的锁对象，调用`set_unlocked()`后，会将当前对象头的`markword`(上述代码中的`value()`)与`unlocked_value`进行**或**操作。这样就能构造出一个无锁状态的`markword`（也就是最后两位为`01`）。
-所以，当在获取轻量锁的流程中，CAS算法的预期值**肯定**是一个无锁状态的`markword`。这个锁对象的锁状态没有关系。
+`lock`就是当前的锁对象，调用`set_unlocked()`后，会将当前对象头的`markword`(上述代码中的`value()`)与`unlocked_value`进行**或**操作。这样就能构造出一个无锁状态的`markword`（也就是最后两位为`01`）。所以CAS算法的旧预期值displaced**肯定**是一个无锁状态的`markword`，这跟锁对象的锁状态没有关系。
 
-假设现在有threadA，第一次请求轻量锁时，对象头的`markword`最后两位一定为`01`，因为要么当前处于无锁状态，要么处于偏向锁状态。所以CAS算法的预期值和实际值符合。threadA成功获取锁。
+假设现在有threadA，**第一次**请求轻量锁时，锁对象头的`markword`第31~32位一定是`01`（因为如果走到这个CAS，锁对象头的markword一定是无锁状态）。`lockee->mark()`(CAS的真实值)与`displaced`(CAS的预期值)1~30位bit一定是相同的，因为`displaced`只改变了`lockee->mark()`的第32位bit。所以CAS算法的预期值和实际值符合，threadA成功获取锁。
 
-在threadA执行同步区的过程中，如果有threadB请求轻量锁，因为锁对象头的`markword`最后两位一定为`00`(详情见Q1)，但是我们构建的预期值`displaced`最后两位一定为`01`。所以CAS算法调用失败，保证了轻量锁的互斥获取。
+在threadA执行同步区的过程中，如果有threadB请求轻量锁，因为`lockee->mark()`最后两位一定为`00`(详情见Q1)，但是我们构建的预期值`displaced`最后两位一定为`01`。所以CAS算法调用失败，保证了轻量锁的互斥获取。
 
 ---
 
@@ -887,7 +888,7 @@ void ATTR ObjectMonitor::enter(TRAPS) {
 
 当线程释放锁时，会从cxq或EntryList中挑选一个线程唤醒，被选中的线程叫做Heir presumptive即假定继承人（即图中的ready thread），假定继承人被唤醒后会尝试获得锁，但synchronized是非公平的，所以假定继承人不一定能获得锁（这也是它叫"假定"继承人的原因）。
 
-如果线程获得锁后调用Object#wait方法，则会将线程加入到WaitSet中，当被Object#notify唤醒后，会将线程从WaitSet移动到cxq或EntryList中去。需要注意的是，**当调用一个锁对象的wait或notify方法时，如当前锁的状态是偏向锁或轻量级锁则会先膨胀成重量级锁。** 源码分析如下：
+如果线程获得锁后调用Object.wait方法，则会将线程加入到WaitSet中，当被Object#notify唤醒后，会将线程从WaitSet移动到cxq或EntryList中去。需要注意的是，**当调用一个锁对象的wait或notify方法时，如当前锁的状态是偏向锁或轻量级锁则会先膨胀成重量级锁。** 源码分析如下：
 
 
 ``` java
