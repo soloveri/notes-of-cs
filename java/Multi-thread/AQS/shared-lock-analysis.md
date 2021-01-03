@@ -379,4 +379,3 @@ protected int tryAcquireShared(int acquires) {
 3. [引入PROPAGATE之后的AQS差异](http://gee.cs.oswego.edu/cgi-bin/viewcvs.cgi/jsr166/src/main/java/util/concurrent/locks/AbstractQueuedSynchronizer.java?r1=1.73&r2=1.74)
 
 4.[面试官问我AQS中的PROPAGATE有什么用？](https://jishuin.proginn.com/p/763bfbd33115)
-
