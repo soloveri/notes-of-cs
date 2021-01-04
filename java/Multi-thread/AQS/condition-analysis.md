@@ -296,54 +296,11 @@ final boolean transferAfterCancelledWait(Node node) {
         Thread.yield();
     return false;
 }
-```
 
-如果中断先于`signal`发生，那么则会调用`enq`将当前node加入同步队列并返回`true`。否则自旋直到当前节点成功加入同步队列，随后返回`false`。这里我存在一个问题：如果`signal`先于中断发生，那么为什么一定要保证当前node加入了同步队列呢？
-
-可以看出，`transferAfterCancelledWait`就是判断中断和`signal`到底谁先发生的关键函数。如果中断先发生，则返回true，否则返回false。在返回之后，我们再次回到`checkInterruptWhileWaiting`。如果中断发生，那么则返回`THROW_IE`，否则返回`REINTERRUPT`。这两个是什么意思？通过下面的注释，我们了解到，`THROW_IE`表示在`wait`退出后，需要抛出一个中断异常，否则只是重新设置中断位。
-
-``` java
-/** Mode meaning to reinterrupt on exit from wait */
-private static final int REINTERRUPT =  1;
-/** Mode meaning to throw InterruptedException on exit from wait */
-private static final int THROW_IE    = -1;
-```
-
-我们的视角再次回到`await`：
-
-``` java
-public final void await() throws InterruptedException {
-    ...
-    while (!isOnSyncQueue(node)) {
-        //调用park函数后当前线程被主动挂起
-        LockSupport.park(this);
-        if ((interruptMode = checkInterruptWhileWaiting(node)) != 0)
-            break;
-    }
-    // 处理park期间发生中断的情况
-    if (acquireQueued(node, savedState) && interruptMode != THROW_IE)
-        interruptMode = REINTERRUPT;
-    if (node.nextWaiter != null) // clean up if cancelled
-        unlinkCancelledWaiters();
-    if (interruptMode != 0)
-        reportInterruptAfterWait(interruptMode);
-}
-```
-
-在判断中断与`signal`谁先发生后，则会跳出循环（如果中断和`signal`都没有发生，那么则会继续调用park挂起自己）。首先会调用`acquireQueued`抢锁，注意这里需要获得锁的次数为`saveState`，因为需要与被挂起之前的重入次数相等。然后就是将条件队列中的出队节点的`nextWaiter`设为null。因为有可能是`signal`先发生，所以需要使用`if`判断
-
-``` java
-private void reportInterruptAfterWait(int interruptMode)
-    throws InterruptedException {
-    if (interruptMode == THROW_IE)
-        throw new InterruptedException();
-    else if (interruptMode == REINTERRUPT)
-        selfInterrupt();
-}
-```
-
-``` java
+// 判断node是否已经处于同步队列
 final boolean isOnSyncQueue(Node node) {
+    //条件队列中的node是不会设置prev与next指针的
+
     if (node.waitStatus == Node.CONDITION || node.prev == null)
         return false;
     if (node.next != null) // If has successor, it must be on queue
@@ -360,12 +317,65 @@ final boolean isOnSyncQueue(Node node) {
 }
 ```
 
+如果中断先于`signal`发生，那么则会调用`enq`将当前node加入同步队列并返回`true`。否则自旋直到当前节点成功加入同步队列，随后返回`false`。这里我存在一个问题：如果`signal`先于中断发生，那么为什么一定要保证当前node加入了同步队列呢？
 
+可以看出，`transferAfterCancelledWait`就是判断中断和`signal`到底谁先发生的关键函数。如果中断先发生，则返回true，否则返回false。在返回之后，我们再次回到`checkInterruptWhileWaiting`。如果中断发生，那么则返回`THROW_IE`，否则返回`REINTERRUPT`。这两个是什么意思？通过下面的注释，我们了解到，`THROW_IE`表示在`wait`退出后，需要抛出一个中断异常，否则只是重新设置中断位。
 
+``` java
+/** Mode meaning to reinterrupt on exit from wait */
+private static final int REINTERRUPT =  1;
+/** Mode meaning to throw InterruptedException on exit from wait */
+private static final int THROW_IE    = -1;
+```
 
+我们的视角再次回到`await`，在判断中断与`signal`谁先发生后，则会跳出循环（如果中断和`signal`都没有发生，那么则会继续调用park挂起自己）。在跳出循环后，会执行三个`if`条件，基本的理解我都以注释的形式写在了代码中。还是比较容易理解的。
 
-## 通知机制
+``` java
+public final void await() throws InterruptedException {
+    ...
+    while (!isOnSyncQueue(node)) {
+        //调用park函数后当前线程被主动挂起
+        LockSupport.park(this);
+        if ((interruptMode = checkInterruptWhileWaiting(node)) != 0)
+            break;
+    }
+    // 处理park期间发生中断的情况
 
+    /*
+    * 需要获得锁savedState次，因为需要与调用await之前线程持有锁的状态一致
+    */
+    if (acquireQueued(node, savedState) &&
+    /*
+    * acquireQueueed返回true表示在抢锁过程中发生了中断了，
+    * 如果没有后半部分的判断条件，那么原来可能interruptMode=THROW_IE,THROW_IE,在await结束后
+    * 需要抛出中断异常，但是interruptMode被覆盖为REINTERRUPT
+    * 这样仅仅只会重新设置中断位，丢失了原本需要抛出的中断异常
+    */
+    interruptMode != THROW_IE)
+        interruptMode = REINTERRUPT;
+    /*
+    * 在node被移出条件队列后，需要设置node的nextWaiter指针
+    * 在中断先发生的情况下，node只是被加入了同步队列，而没有设置nextWaiter指针
+    * 但是signal先发生的情况下，node的nextWaiter已经被修改了，所以使用if判断
+    */
+    if (node.nextWaiter != null) // clean up if cancelled
+        unlinkCancelledWaiters();
+    if (interruptMode != 0)
+    // node被移出条件队列后，要根据interruptMode的值来决定是抛出异常还是重新设置中断标志位
+        reportInterruptAfterWait(interruptMode);
+}
+
+// 根据interruptMode的值来决定是抛出异常还是设置中断标志位
+private void reportInterruptAfterWait(int interruptMode)
+    throws InterruptedException {
+    // 直接抛出中断异常
+    if (interruptMode == THROW_IE)
+        throw new InterruptedException();
+    //重新设置中断位
+    else if (interruptMode == REINTERRUPT)
+        selfInterrupt();
+}
+```
 
 ## 参考文章
 
