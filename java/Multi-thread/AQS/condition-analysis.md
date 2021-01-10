@@ -292,6 +292,9 @@ final boolean transferAfterCancelledWait(Node node) {
     * incomplete transfer is both rare and transient, so just
     * spin.
     */
+    // 为什么一定要保证节点加入了同步队列？
+    // 因为如果直接返回false，后续会执行acquireQueued抢锁
+    // node都未加入同步队列怎么抢？必然会发生奇怪的不可预期的事情
     while (!isOnSyncQueue(node))
         Thread.yield();
     return false;
@@ -328,7 +331,7 @@ private static final int REINTERRUPT =  1;
 private static final int THROW_IE    = -1;
 ```
 
-我们的视角再次回到`await`，在判断中断与`signal`谁先发生后，则会跳出循环（如果中断和`signal`都没有发生，那么则会继续调用park挂起自己）。在跳出循环后，会执行三个`if`条件，基本的理解我都以注释的形式写在了代码中。还是比较容易理解的。
+我们的视角再次回到`await`，在判断中断与`signal`谁先发生后，则会跳出循环（如果中断和`signal`都没有发生，那么则会继续调用park挂起自己）。在跳出循环后，会执行三个`if`条件，基本流程我都以注释的形式写在了代码中，还是比较容易理解的。
 
 ``` java
 public final void await() throws InterruptedException {
@@ -376,6 +379,10 @@ private void reportInterruptAfterWait(int interruptMode)
         selfInterrupt();
 }
 ```
+
+## 总结
+
+条件队列还是比较简单的，最复杂的地方就是`signal`与中断如果都发生了，那么情况就比较棘手。条件队列仅通过额外的`nextWaiter`指针维护一个单向队列，如果线程的资源要求达到满足，那么就会将节点从条件队列移步至同步队列抢锁。
 
 ## 参考文章
 
