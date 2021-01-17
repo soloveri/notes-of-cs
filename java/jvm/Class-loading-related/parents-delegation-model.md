@@ -200,6 +200,14 @@ protected Class<?> loadClass(String name, boolean resolve)
 
 **系统类加载器的设置**
 
+update：2021-01-18 00:31:03
+
+复习到这时，我提出了一个问题：系统类加载器的设置和三类加载器之间的关系是怎么样的？是谁调用谁的？
+
+目前我只能回答这个问题的一半：某个函数会首先调用`getSystemClassLoader()`，然后调用链如下：`getSystemClassLoader()`--->`initSystemClassLoader`--->`sun.misc.Launcher.getLauncher()`
+
+---
+
 我曾在上面提到，如果没有意外发生，那么在jvm中，`AppClassLoader`会被设置为默认的系统类加载器，这也是为什么会在某些场合称其为“系统类加载器”。那么这一设置是什么时候完成的呢？这一切都起源于`ClassLoader`中的方法`getSystemClassLoader`。其注释写道：
 
 >If the system property "java.system.class.loader" is defined
