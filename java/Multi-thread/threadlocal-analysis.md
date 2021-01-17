@@ -373,9 +373,9 @@ private void expungeStaleEntries() {
 
 ## ThreadLocal的删除操作
 
-在插入操作的`set(ThreadLocal<?>, Object)`函数中，我们不止一次提到了两种清除操作:`cleanSomeSlots(int,int)`和`expungeStaleEntry(j)`，那么这两种清除操作最大的区别就是前者为启发式清除操作，后者为线性清除操作，为何这么说？首先来看看`cleanSomeSlots(int,int)`的实现代码：
+在插入操作的`set(ThreadLocal<?>, Object)`函数中，我们不止一次提到了两种清除操作:`cleanSomeSlots(int,int)`和`expungeStaleEntry(j)`，那么这两种清除操作最大的区别就是前者为**启发式**清除操作，后者为**线性**清除操作，为何这么说？首先来看看`cleanSomeSlots(int,int)`的实现代码：
 
-``` java
+``` java "启发式清除操作"
 //参数i表示当前Entry必有效的索引，所以清除要从下一个index开始
 //参数n表示清除操作的执行次数
 private boolean cleanSomeSlots(int i, int n) {
@@ -425,14 +425,14 @@ private int expungeStaleEntry(int staleSlot) {
             size--;
         }
         //遇到正常的Entry，那么就尝试重新计算索引
-        //因为在此之前这个Entry是因为哈希冲突才来到当前位置的 
+        //因为在此之前这个Entry是因为哈希冲突才来到当前位置的
+        // 这么做的目的是让Entry更接近它的理想位置h
         else {
             int h = k.threadLocalHashCode & (len - 1);
             if (h != i) {
                 tab[i] = null;
 
-                // Unlike Knuth 6.4 Algorithm R, we must scan until
-                // null because multiple entries could have been stale.
+                
                 /*
                 * 以下解析摘自参考文章[1]
                 * 在原代码的这里有句注释值得一提，原注释如下：
@@ -464,28 +464,24 @@ private int expungeStaleEntry(int staleSlot) {
 }
 ```
 
+线性操作的原理比较简单：
+
+1. 如果遇到了失效Entry，就将其移除
+2. 如果遇到了正常Entry，那么就对其进行冲哈希定位，目的是尽可能地将当前Entry放在它应该在的位置上
+3. 如果遇到了空槽位，那么就直接返回当前空槽位的索引
+
+在了解了两种清除操作之后，再去看`ThreadLocal`的移出操作就非常简单了，我们一般都会调用`remove`进行移出，实现代码如下：
+
 ``` java
-/**
-* Removes the current thread's value for this thread-local
-* variable.  If this thread-local variable is subsequently
-* {@linkplain #get read} by the current thread, its value will be
-* reinitialized by invoking its {@link #initialValue} method,
-* unless its value is {@linkplain #set set} by the current thread
-* in the interim.  This may result in multiple invocations of the
-* {@code initialValue} method in the current thread.
-*
-* @since 1.5
-*/
+// 即使没有在ThreadLocal中存入值，也可以调用remove方法
 public void remove() {
     ThreadLocalMap m = getMap(Thread.currentThread());
     if (m != null)
         m.remove(this);
 }
-```
 
-``` java
 /**
-* Remove the entry for key.
+* 寻找目标Entry进行移出，并会顺带调用expungeStaleEntry进行线性清除
 */
 private void remove(ThreadLocal<?> key) {
     Entry[] tab = table;
@@ -501,24 +497,37 @@ private void remove(ThreadLocal<?> key) {
         }
     }
 }
-
 ```
+
+所以经过以上学习，我们可以总结出：
+
+1. 启发式清除操作会在`set(ThreadLocal<?>, Object)`中的两个地方被调用：
+    - table中存在目标Entry，那么就从找到的失效Entry开始启发式清除
+    - table中不存在目标Entry，那么就从新插入的Entry开始启发式清除
+2. 线性清除操作出现的地方比较多：
+    - 在启发式清除中会开始线性清除
+    - 在`replaceStaleEntry`中，会先进行线性清除，之后进行启发式清除
 
 ### ThreadLocal中的内存泄漏问题
 
+在前面我们曾提出了一个问题，为什么要对`ThreadLocal`使用弱引用，首先我们需要直到什么是弱引用：
 
+>使用WeakReference修饰的对象被称为弱引用，只要发生垃圾回收，若这个对象只被弱引用指向，那么就会被回收
+
+也就是说，当一个对象只存在弱引用时，无论内存空间是否足够，都会将其回收。那么试想如下一个场景：
+
+如果对于一个`ThreadLocal`对象引用`a=new ThreadLocal<>()`，当我们不再需要这个`ThreadLocal`对象时，那么就会将`a`设为null。但是曾经使用过该`ThreadLocal`对象的线程A内部的`ThreadLocalMap`仍然持有该`ThreadLocal`对象的引用，所以如果不使用虚引用，那么否则直到线程A死亡，该`ThreadLocal`对象都不会被回收。当线程A运行时间特别长时，可能由于`ThreadLocal`对象无法被回收的问题，可能内存空间会越来越小。
+
+所以这种类型的内存泄漏已经被大牛们解决了。那么我们常说的ThreadLocal内存泄漏是什么呢？
+
+不知大家是否还记得`Entry`的结构，其内部属性`value`仍然是一个强引用，就会出现key无效但是value有效的`Entry`对象，导致`Entry`对象仍然无法会回收。所以虽然在调用`set`方法时，大概率会将无效`Entry`对象清除，但这种清除并不是百分百生效的。所以当我们不在需要一个`ThreadLocal`对象时，最后手动调用`remove`方法清除无效Entry，防止内存泄漏。
 
 ## ThreadLocal的获取操作
 
+实现获取操作的`get()`方法很简单，如下所示：
+
 ``` java "get()实现源码"
-/**
-* Returns the value in the current thread's copy of this
-* thread-local variable.  If the variable has no value for the
-* current thread, it is first initialized to the value returned
-* by an invocation of the {@link #initialValue} method.
-*
-* @return the current thread's value of this thread-local
-*/
+
 public T get() {
     Thread t = Thread.currentThread();
     ThreadLocalMap map = getMap(t);
@@ -530,14 +539,84 @@ public T get() {
             return result;
         }
     }
+    // 如果没有存入value，那么则会初始化默认value并返回
     return setInitialValue();
 }
-
 ```
 
+## InheritableThreadLocal原理
 
+除了`ThreadLocal`，还有一种用于实现父子线程数据共享的`ThreadLocal`:`InheritableThreadLocal`，它的具体实现是在Thread类中除了threadLocals外还有一个inheritableThreadLocals对象。
+
+``` java
+public
+class Thread implements Runnable {
+    ...
+    /* ThreadLocal values pertaining to this thread. This map is maintained
+     * by the ThreadLocal class. */
+    ThreadLocal.ThreadLocalMap threadLocals = null;
+
+    /*
+     * InheritableThreadLocal values pertaining to this thread. This map is
+     * maintained by the InheritableThreadLocal class.
+     */
+    ThreadLocal.ThreadLocalMap inheritableThreadLocals = null;
+```
+
+在线程对象初始化的时候，会调用ThreadLocal的createInheritedMap从父线程的inheritableThreadLocals中把有效的entry都拷过来，做的事情就是以父线程的inheritableThreadLocalMap为数据源，过滤出有效的entry，初始化到自己的inheritableThreadLocalMap中。其中childValue可以被重写。需要注意的地方是InheritableThreadLocal只是在子线程创建的时候会去拷一份父线程的inheritableThreadLocals。如果父线程是在子线程创建后再set某个InheritableThreadLocal对象的值，对子线程是不可见的。
 
 ## ThreadLocal的基本使用
+
+下面是一个在线程中简单使用`ThreadLocal`的例子：
+
+``` java
+public class ThreadLocalExample1 {
+
+    // (1) 创建ThreadLocal变量
+    static ThreadLocal<String> localVariable = new ThreadLocal<>();
+
+    // (2)print函数
+    static void print(String str){
+        // 打印当前线程本地内存中localVariable变量的值
+        System.out.println(str + ":" + localVariable.get());
+        // 2.1 清楚当前线程本地内存变量
+//        localVariable.remove();
+    }
+
+    public static void main(String[] args) {
+
+        // (3) 创建线程one
+        Thread threadOne = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                // 设置threadOne中的本地变量localVariable的值
+                localVariable.set("threadOne local variable");
+                // 调用打印函数
+                print("threadOne");
+                System.out.println("threadOne remove after" + localVariable.get());
+            }
+        });
+
+
+        // 创建线程two
+        Thread threadTwo = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                // 设置threadTwo线程中的本地线程变量
+                localVariable.set("threadTwo local variable");
+                // 调用打印函数
+                print("threadTwo");
+                // 打印本地线程变量
+                System.out.println("threadTwo remove after" + ":" + localVariable.get());
+            }
+        });
+
+        // (5)启动线程
+        threadOne.start();
+        threadTwo.start();
+    }
+}
+```
 
 ## 总结
 
@@ -546,3 +625,7 @@ public T get() {
 ## 参考文章
 
 1. [ThreadLocal源码解读](https://www.cnblogs.com/micrari/p/6790229.html)
+
+2.[面试官：小伙子，听说你看过ThreadLocal源码？](https://segmentfault.com/a/1190000022663697)
+
+3.[面试官连环炮轰炸的ThreadLocal 吃透源码的每一个细节和设计原理](https://zhuanlan.zhihu.com/p/88133406)
