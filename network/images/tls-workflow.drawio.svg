@@ -1,0 +1,121 @@
+<svg host="65bd71144e" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" width="515px" height="514px" viewBox="-0.5 -0.5 515 514" content="&lt;mxfile host=&quot;7397f329-8acc-4375-acff-f89c19f8c853&quot; modified=&quot;2021-01-28T05:58:45.521Z&quot; agent=&quot;5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.52.1 Chrome/83.0.4103.122 Electron/9.3.5 Safari/537.36&quot; version=&quot;13.10.0&quot; etag=&quot;WqdSZoFcKt-gyXd4dUbQ&quot; type=&quot;embed&quot;&gt;&lt;diagram id=&quot;YjL8ZVz6J1p3TjT-IrjK&quot; name=&quot;Page-1&quot;&gt;7VlRc9soEP41es1IQsLyY2O715ne3WQmN3PtU4ZIG4spEhqEE7u//hYL2UI4UzeV20mufohhgQX2+z4Wk4Asqu0fijXlX7IAEcRhsQ3IMojjLE7xrzHsOkMyyzrDWvGiM0VHwy3/CtYYWuuGF9A6HbWUQvPGNeayriHXjo0pJZ/cbg9SuLM2bA2e4TZnwrf+ywtd9tuaHe0fgK/LfuaIzruWivWd7U7akhXyaWAiq4AslJS6K1XbBQgTuz4u3bj3z7QeFqag1ucMIN2ARyY2dm92XXrXbxaX2JhitV0bMK9y3ubyKpdVs9Gg2jtWF3cNKN6UoJhor9BY8ZqJgFyXusKvZYTFRvIaW1aPuLDW2grWlmAWEmLlgQuxkEKq/awkJDSbz9DeaiW/wKDlYf85tPQAYOiuH0FpjjD9ye5B3MiWay5rbLuXWstq0OGd4GvToGWDVmZrOZglokFutOA1TtrTxyzQRgo9wPbZaEcHDJH7ICvQaodd+gGJhd3yPprb+tORRdR6LQcEShPLXcvb9cHzEVosWHRPI51MjzS/r+4Qan7H2iQMf+Pt4U2jEd4Z9fBOiI83jX8c7/TbeENdvDOnIdZqWcMQochFE/erdp9MYK7Svvp52Lbc2qh1td2wdoOUweWbSA8CC4V3xo7Cioc6U2vQg5PKj/Qgkml4QjnWpkAwzR/dGU+F185wY+g7EO4scoCkvXB7F63cqBzsqOF5O3Y0dxmRRCNH3ZY9R3u0D9s+iwD0jREg+ZUEoCR2CUCTlxGAxi4B4iS7FAFm30WAXLC25bkL+7lI/TpdjqL5Ul1S4joi5GK6zDxYFoLDfjEfsKf0QML8o11YvAQ2znMVLwoz/FpBy7+y+72rsE/L+y2l10G6NL42GhPn/oYdTZP1SJq6oGT+LSc7wYk4fB7+c7Pe/O1z3qPq7KW5aCQec4e7EOf7LDfA5RYUsuzNkp7Qn0f6KPr/sT5Jp2L9OGVMyPrYP+oNZx+QtRqCFQmQEVl0UMJHMPFcbfOS1esT7VYp4dLc1V67YFAxLg7EFwyJLqWYM949XrtixkRP6UR3I3rBPOG/UhwuR8+oY9FV43Cxf5fAwm0D+euXBx2hl/jyOMmeSeTxfY8Hr1IeHqunSije28CE8vB/0/8NT4bygADIGkv/8PwL/mJ+8+pwkwc9pY5kGnVg9fge34F2/KcGWf0H&lt;/diagram&gt;&lt;/mxfile&gt;">
+    <defs/>
+    <g>
+        <rect x="1" y="5" width="61" height="54" fill="none" stroke="none" pointer-events="all"/>
+        <path d="M 10.02 53.28 L 10.02 44.98 L 54.04 44.98 L 54.04 53.28 Z" fill="#036897" stroke="#ffffff" stroke-width="2" stroke-linejoin="round" stroke-miterlimit="10" pointer-events="all"/>
+        <path d="M 62 37.71 L 62 46.03 L 54.04 53.28 L 54.04 44.98 L 10.02 44.98 Z" fill="#036897" stroke="#ffffff" stroke-width="2" stroke-linejoin="round" stroke-miterlimit="10" pointer-events="all"/>
+        <path d="M 54.04 44.98 L 54.04 12.27 L 10.02 12.27 L 10.02 44.98 Z M 54.04 44.98 L 62 37.71 L 62 5 L 17.44 5 L 10.02 12.27 L 54.04 12.27 Z M 54.04 12.27 L 62 5" fill="#036897" stroke="#ffffff" stroke-width="2" stroke-linejoin="round" stroke-miterlimit="10" pointer-events="all"/>
+        <path d="M 51.93 59 L 51.93 54.33 L 1 54.33 L 6.84 48.61 L 57.77 48.61 L 57.77 53.28 Z M 51.93 54.33 L 51.93 59 L 1 59 L 1 54.33 Z M 51.93 54.33 L 57.77 48.61" fill="#036897" stroke="#ffffff" stroke-width="2" stroke-linejoin="round" stroke-miterlimit="10" pointer-events="all"/>
+        <rect x="1" y="5" width="0" height="0" fill="none" stroke="#ffffff" stroke-width="2" pointer-events="all"/>
+        <path d="M 50.33 41.35 L 50.33 15.9 L 13.73 15.9 L 13.73 41.35 Z" fill="none" stroke="#ffffff" stroke-width="2" stroke-miterlimit="10" pointer-events="all"/>
+        <rect x="471" y="1" width="43" height="62" fill="none" stroke="none" pointer-events="all"/>
+        <path d="M 503.38 11.51 L 471 11.51 L 471 63 L 503.38 63 Z M 503.38 63 L 514 52.49 L 514 1 L 484.27 1 L 471 11.51 L 503.38 11.51 Z M 503.38 11.51 L 514 1 M 471 15.72 L 503.38 15.72 L 514 5.1" fill="#036897" stroke="#ffffff" stroke-width="2" stroke-linejoin="round" stroke-miterlimit="10" pointer-events="all"/>
+        <rect x="471" y="1" width="0" height="0" fill="none" stroke="#ffffff" stroke-width="2" pointer-events="all"/>
+        <path d="M 484.81 28.33 L 484.81 25.7 L 473.66 25.7 L 473.66 28.33 Z M 500.19 28.33 L 500.19 25.7 L 489.04 25.7 L 489.04 28.33 Z" fill="none" stroke="#ffffff" stroke-width="2" stroke-miterlimit="10" pointer-events="all"/>
+        <path d="M 32 505 L 31.5 59" fill="none" stroke="#000000" stroke-miterlimit="10" stroke-dasharray="3 3" pointer-events="stroke"/>
+        <path d="M 493 479 L 492.5 63" fill="none" stroke="#000000" stroke-miterlimit="10" stroke-dasharray="3 3" pointer-events="stroke"/>
+        <path d="M 31 105 L 484.66 144.45" fill="none" stroke="#000000" stroke-miterlimit="10" pointer-events="stroke"/>
+        <path d="M 489.89 144.9 L 482.61 147.78 L 484.66 144.45 L 483.22 140.81 Z" fill="#000000" stroke="#000000" stroke-miterlimit="10" pointer-events="all"/>
+        <rect x="216" y="95" width="80" height="20" fill="none" stroke="none" pointer-events="all"/>
+        <g transform="translate(-0.5 -0.5)">
+            <switch>
+                <foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility">
+                    <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 1px; height: 1px; padding-top: 105px; margin-left: 256px;">
+                        <div style="box-sizing: border-box; font-size: 0; text-align: center; ">
+                            <div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: #000000; line-height: 1.2; pointer-events: all; white-space: nowrap; ">
+                                Client Hello
+                            </div>
+                        </div>
+                    </div>
+                </foreignObject>
+                <text x="256" y="109" fill="#000000" font-family="Helvetica" font-size="12px" text-anchor="middle">
+                    Client Hello
+                </text>
+            </switch>
+        </g>
+        <path d="M 491 185 L 37.35 214.59" fill="none" stroke="#000000" stroke-miterlimit="10" pointer-events="stroke"/>
+        <path d="M 32.12 214.93 L 38.87 210.98 L 37.35 214.59 L 39.33 217.96 Z" fill="#000000" stroke="#000000" stroke-miterlimit="10" pointer-events="all"/>
+        <rect x="216" y="175" width="80" height="20" fill="none" stroke="none" pointer-events="all"/>
+        <g transform="translate(-0.5 -0.5)">
+            <switch>
+                <foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility">
+                    <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 1px; height: 1px; padding-top: 185px; margin-left: 256px;">
+                        <div style="box-sizing: border-box; font-size: 0; text-align: center; ">
+                            <div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: #000000; line-height: 1.2; pointer-events: all; white-space: nowrap; ">
+                                Server Hello
+                            </div>
+                        </div>
+                    </div>
+                </foreignObject>
+                <text x="256" y="189" fill="#000000" font-family="Helvetica" font-size="12px" text-anchor="middle">
+                    Server Hello
+                </text>
+            </switch>
+        </g>
+        <path d="M 491 265 L 37.34 304.45" fill="none" stroke="#000000" stroke-miterlimit="10" pointer-events="stroke"/>
+        <path d="M 32.11 304.9 L 38.78 300.81 L 37.34 304.45 L 39.39 307.78 Z" fill="#000000" stroke="#000000" stroke-miterlimit="10" pointer-events="all"/>
+        <rect x="96" y="245" width="310" height="20" fill="none" stroke="none" pointer-events="all"/>
+        <g transform="translate(-0.5 -0.5)">
+            <switch>
+                <foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility">
+                    <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 1px; height: 1px; padding-top: 255px; margin-left: 251px;">
+                        <div style="box-sizing: border-box; font-size: 0; text-align: center; ">
+                            <div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: #000000; line-height: 1.2; pointer-events: all; white-space: nowrap; ">
+                                Certificate、Server Key Exchange、Server Hello Done
+                            </div>
+                        </div>
+                    </div>
+                </foreignObject>
+                <text x="251" y="259" fill="#000000" font-family="Helvetica" font-size="12px" text-anchor="middle">
+                    Certificate、Server Key Exchange、Server Hello Done
+                </text>
+            </switch>
+        </g>
+        <path d="M 31 375 L 484.66 414.45" fill="none" stroke="#000000" stroke-miterlimit="10" pointer-events="stroke"/>
+        <path d="M 489.89 414.9 L 482.61 417.78 L 484.66 414.45 L 483.22 410.81 Z" fill="#000000" stroke="#000000" stroke-miterlimit="10" pointer-events="all"/>
+        <rect x="121" y="355" width="250" height="20" fill="none" stroke="none" pointer-events="all"/>
+        <g transform="translate(-0.5 -0.5)">
+            <switch>
+                <foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility">
+                    <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 1px; height: 1px; padding-top: 365px; margin-left: 246px;">
+                        <div style="box-sizing: border-box; font-size: 0; text-align: center; ">
+                            <div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: #000000; line-height: 1.2; pointer-events: all; white-space: nowrap; ">
+                                Client Key Exchange、Change Cipher Spec
+                            </div>
+                        </div>
+                    </div>
+                </foreignObject>
+                <text x="246" y="369" fill="#000000" font-family="Helvetica" font-size="12px" text-anchor="middle">
+                    Client Key Exchange、Change Cipher Spec
+                </text>
+            </switch>
+        </g>
+        <path d="M 491 465 L 37.34 504.45" fill="none" stroke="#000000" stroke-miterlimit="10" pointer-events="stroke"/>
+        <path d="M 32.11 504.9 L 38.78 500.81 L 37.34 504.45 L 39.39 507.78 Z" fill="#000000" stroke="#000000" stroke-miterlimit="10" pointer-events="all"/>
+        <rect x="126" y="455" width="240" height="20" fill="none" stroke="none" pointer-events="all"/>
+        <g transform="translate(-0.5 -0.5)">
+            <switch>
+                <foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility">
+                    <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 1px; height: 1px; padding-top: 465px; margin-left: 246px;">
+                        <div style="box-sizing: border-box; font-size: 0; text-align: center; ">
+                            <div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: #000000; line-height: 1.2; pointer-events: all; white-space: nowrap; ">
+                                New Session Ticket、Change Cipher Spec
+                            </div>
+                        </div>
+                    </div>
+                </foreignObject>
+                <text x="246" y="469" fill="#000000" font-family="Helvetica" font-size="12px" text-anchor="middle">
+                    New Session Ticket、Change Cipher Spec
+                </text>
+            </switch>
+        </g>
+    </g>
+    <switch>
+        <g requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"/>
+        <a transform="translate(0,-5)" xlink:href="https://desk.draw.io/support/solutions/articles/16000042487" target="_blank">
+            <text text-anchor="middle" font-size="10px" x="50%" y="100%">
+                Viewer does not support full SVG 1.1
+            </text>
+        </a>
+    </switch>
+</svg>
