@@ -63,7 +63,7 @@ public class DraconianSingleton {
 
 ## 2.volatile做了什么
 
-volatile能够禁止上述指令重排的原因是因为它在volatile write操作之前插入了内存屏障，禁止volatile write操作之前任何的read/write操作重排序到volatile write之后。在执行`new DraconianSingleton()`时，构造函数肯定会执行write操作，所以构造函数的write操作一定不会被重排序到volatile write操作之后，从而保证了只会在实例化对象完成后才会`instance`赋值。
+volatile能够禁止上述指令重排的原因是因为它在volatile write操作之前插入了内存屏障，禁止volatile write操作之前任何的read/write操作重排序到volatile write之后。在执行`new DraconianSingleton()`时，构造函数(构造函数可以会执行写操作，例如写变量的初值)肯定会执行write操作，所以构造函数的write操作一定不会被重排序到volatile write操作之后，从而保证了只会在实例化对象完成后才会`instance`赋值。
 
 网上许多文章都说volatile会执行上述的操作禁止指令重排，但是几乎没有人说它为什么这么做。我尝试使用如下代码解释一下我的理解：
 
