@@ -231,6 +231,47 @@ update：2021-01-18 00:27:01
 
 3. 虚拟机会保证父类的类构造器`<cinit>()`一定会在子类的`<cinit>()`执行之前执行，这与实例构造器`<init>()`一样，会保证父类的实例构造器先于子类执行，并且JVM保证在多线程环境下`<cinit>()`只会被执行一次
 
+这里怎么保证呢？就是虽然`super`是在是在子类构造器中调用的，但是`super`实际是在调用父类的`<init>`，而子类的`<init>`根本还没有开始执行，这样保证了父类的`<init>`一定会在子类的`<init>`之前完成，例如在下面的代码中：
+
+``` java
+public class FieldHashNoPolymorphic {
+    static class Father {
+        public int money = 1;
+        public Father() {
+            ...
+            showMeTheMoney();
+        }
+        public void showMeTheMoney() {
+            System.out.println("I am Father, I have $" + money);
+        }
+    }
+    static class Son extends Father {
+        public int money = 3;
+        public Son() {
+            //虽然super在Son的构造方法中，但是实际上Son的<init>还没有开始执行
+            super();
+            ...
+            showMeTheMoney();
+        }
+        @Override
+        public void showMeTheMoney() {
+            System.out.println("I am Son, I have $" + this.money);
+        }
+    }
+    public static void main(String[] args) {
+        Father guy = new Son();
+        ...
+    }
+}
+```
+
+在执行`super`的时候，`Son`类的`<init>`方法还没有开始调用，所以`Son`类的`money`字段仍然为0。那么`<init>`由哪些部分组成呢？与`<cinit>`类似，也是由三部分组成：
+
+1. 成员变量显式赋值代码
+2. 非静态代码块中的代码
+3. 构造器中的代码
+
+其中1、2部分按照出现的顺序排列，3永远排在最后执行。
 
 ### 2.5.1 接口的初始化
 
@@ -303,7 +344,7 @@ public class FieldHashNoPolymorphic {
     static class Son extends Father {
         public int money = 3;
         public Son() {
-            super(this);
+            super(this);//这个this实际上是不能被传递的，这里只是示意
             System.out.println(this);
             money = 4;
             showMeTheMoney();
@@ -446,6 +487,7 @@ public class Test {
     }
 }
 ```
+
 一个经常出现的错误答案是：
 >count1=1;
 count2=1;
