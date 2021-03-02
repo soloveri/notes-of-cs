@@ -529,10 +529,35 @@ JDK1.8中是先把节点放入map中,最后再决定是否要调用`resize`,我�
 
 ## 0x4 JDK1.7的HashMap中存在的问题
 
-1. 死循环问题,因为1.7中采用头插法,在多线程环境下进行扩容操作时可能会形成循环链表,导致在进行get操作时陷入死循环。
+1. 死循环问题,因为1.7中采用头插法,在多线程环境下进行扩容操作时(resize过后在调用transfor时可能会出现问题)可能会形成循环链表,导致在进行get操作时陷入死循环。
+
+对于1.7hashmap的transform方法：
+
+``` java
+void transfer(Entry[] newTable) {
+    Entry[] src = table;
+    int newCapacity = newTable.length;
+    for (int j = 0; j < src.length; j++) {
+        Entry<K,V> e = src[j];
+        if (e != null) {
+            src[j] = null;
+            do {
+                Entry<K,V> next = e.next;
+                int i = indexFor(e.hash, newCapacity);
+                //如果线程1在这就被挂起，那么当前这个do...while循环本身就不会结束
+                e.next = newTable[i];
+                newTable[i] = e;
+                //线程1正准备执行下面一句时被挂起，才会出现get时死循环
+                e = next;
+            } while (e != null);
+        }
+    }
+}
+```
+
+在get的时候出现死循环必须要求线程1
 
 2. 数据丢失问题,同样是因为头插法,原始链表的末尾数据可能会产生丢失问题。
-
 
 ## 0x5 JDK1.8的HashMap中存在的问题
 
