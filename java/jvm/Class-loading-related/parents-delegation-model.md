@@ -35,11 +35,9 @@ categories: jvm
 前面说到，该加载器由cpp编写时，所以在编写代码时如果我们需要使用到该加载器，我们可以用null指代启动类加载器，这一规则由java团队约定。
 
 **扩展类加载器**
-
 扩展类加载器由java编写，负责加载`<JAVA_HOME>/lib/ext/`目录下的库，或者由环境变量`java.extdirs`指定目录下的库。
 
 **应用程序加载器**
-
 应用程序类加载器通用由java编写，在代码中可以直接引用。该加载器是我们接触最多的加载器了，默认情况下，我们编写的class都由其加载至jvm中。它负责加载由`classpath`参数指定路径下的类库。
 
 >应用程序类加载器由`sun.misc.Launcher$AppClassLoader`实现。并且应用程序类加载器是ClassLoader中的getSystemClassLoader()方法的返回值
@@ -356,6 +354,8 @@ protected Class<?> loadClass(String name, boolean resolve)
 如果此时用户代码还在覆盖`loadClass`,但是编写出的代码并没有采用双亲委派，那么就会使双亲委派失效。因为双亲委派就是靠`loadClass`来实现的。所以尽管不能避免之前的状态，但是以后要尽量避免让用户覆盖`loadClass`。
 
 所以在JDK1.2之后，在`ClassLoader`中引入了一个`protected`方法`findClass()`。希望引导用户能够覆盖`findClass()`编写自定义类加载器。这样既不影响双亲委派，又可以按照用户自己的意愿加载类，就像上面源码中的那样，当父类加载失败，那么就会调用`findClass()`加载。
+
+所以重写`loadClass`会破坏双亲模型，而重写`findClass`则不会，如果需要在多个类加载器中加载同一个`Class`，则需要使用前者。
 
 ### 3.2 第二次破坏
 
