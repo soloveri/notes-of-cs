@@ -193,6 +193,8 @@ final V putVal(int hash, K key, V value, boolean onlyIfAbsent,
                     //注意,Hash冲突的在这里也会执行插入,导致一条链表过长
                     p.next = newNode(hash, key, value, null);
                     //因为是从p.next开始遍历的,所以在插入第七个元素时,进行树化
+                    //从0开始计算，0表示第一个节点，所以如果原来本身就有8个节点，那么则会调用treeifyBin
+                    //但是只有table的长度达到64时，才会进行树化
                     if (binCount >= TREEIFY_THRESHOLD - 1) // -1 for 1st
                         treeifyBin(tab, hash);
                     break;
@@ -216,6 +218,7 @@ final V putVal(int hash, K key, V value, boolean onlyIfAbsent,
             return oldValue;
         }
     }
+    //为了实现fast-fail机制
     ++modCount;
     //如果插入后元素个数超出了存储阈值,那么就会调用resize扩容
     if (++size > threshold)
