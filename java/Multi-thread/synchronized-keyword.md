@@ -68,7 +68,9 @@ class demo{
 
 ![object memory layout](images/object_header.png)
 
-其中对象头由`markword`和`class pointer`组成。`markword`在32位和64位的机器上略有不同，32bit长的`markword`布局如下所示（图片出自[Synchronized与锁](https://deecyn.com/java-synchronized-and-lock.html)）：
+其中对象头由`markword`和`klass pointer`组成，如果当前对象是数组，那么在`klass pointer`后面还会追加数组的长度。
+
+`klass point`指针指向它的类元数据，用于判断当前对象属于哪个类(Points to another object (a metaobject) which describes the layout and behavior of the original object.)，`markword`在32位和64位的机器上略有不同，32bit长的`markword`布局如下所示（图片出自[Synchronized与锁](https://deecyn.com/java-synchronized-and-lock.html)）：
 
 ![32-markword](images/32-MarkWord.png)
 
@@ -114,7 +116,7 @@ class ObjectMonitor {
 ```
 其中：
 
-- `_header`存储了指向属于`monitor object`的`object header`的指针
+- `_header`存储了指向属于`monitor object`的`object header`的指针，也就是指向对象头的指针
 - `_object`存储了指向`monitor object`的指针
 - `_owner`存储了指向获得监视锁的线程
 - `_EntryList`存储了访问同一临界区但是被阻塞的线程集合
@@ -142,7 +144,7 @@ class ObjectMonitor {
 - `displaced hdr(displaced markword)`:一般用来保存`monitor object`对象头中的`markword`信息副本
 - `owner`：指向`monitor object`的指针。
 
-在后三种锁状态中，都会使用`Lock Record`。但是在偏向锁状态中并不会使用`Lock Record`的`displaced markword`。
+在三种锁状态中，都会使用`Lock Record`。但是在偏向锁状态中并不会使用`Lock Record`的`displaced markword`。
 
 ## 3.1 偏向锁
 
@@ -197,7 +199,7 @@ CASE(_monitorenter): {
       uintptr_t thread_ident;
       uintptr_t anticipated_bias_locking_value;
       thread_ident = (uintptr_t)istate->thread();
-      // 通过位运算计算anticipated_bias_locking_value
+      // 通过或运算计算anticipated_bias_locking_value
       anticipated_bias_locking_value =
       // 将线程id与prototype_header(epoch、分代年龄、偏向模式、锁标志)部分相或
       (((uintptr_t)lockee->klass()->prototype_header() | thread_ident) 
@@ -749,7 +751,7 @@ markOop set_unlocked() const {
 
 `lock`就是当前的锁对象，调用`set_unlocked()`后，会将当前对象头的`markword`(上述代码中的`value()`)与`unlocked_value`进行**或**操作。这样就能构造出一个无锁状态的`markword`（也就是最后两位为`01`）。所以CAS算法的旧预期值displaced**肯定**是一个无锁状态的`markword`，这跟锁对象的锁状态没有关系。
 
-假设现在有threadA，**第一次**请求轻量锁时，锁对象头的`markword`第31~32位一定是`01`（因为如果走到这个CAS，锁对象头的markword一定是无锁状态）。`lockee->mark()`(CAS的真实值)与`displaced`(CAS的预期值)1~30位bit一定是相同的，因为`displaced`只改变了`lockee->mark()`的第32位bit。所以CAS算法的预期值和实际值符合，threadA成功获取锁。
+假设现在有threadA，**第一次**请求轻量锁时，锁对象头的`markword`第31\~32位一定是`01`（因为如果走到这个CAS，锁对象头的markword一定是无锁状态）。`lockee->mark()`(CAS的真实值)与`displaced`(CAS的预期值)1~30位bit一定是相同的，因为`displaced`只改变了`lockee->mark()`的第32位bit。所以CAS算法的预期值和实际值符合，threadA成功获取锁。
 
 在threadA执行同步区的过程中，如果有threadB请求轻量锁，因为`lockee->mark()`最后两位一定为`00`(详情见Q1)，但是我们构建的预期值`displaced`最后两位一定为`01`。所以CAS算法调用失败，保证了轻量锁的互斥获取。
 
@@ -1257,9 +1259,9 @@ QMode = 0：暂时什么都不做，继续往下看；
 
 4. [死磕Synchronized底层实现--偏向锁](https://juejin.cn/post/6844903726554038280)
 
-5. [死磕Synchronized底层实现--轻量级锁 #14](https://github.com/farmerjohngit/myblog/issues/14)
+5. [死磕Synchronized底层实现--轻量级锁](https://github.com/farmerjohngit/myblog/issues/14)
 
-6. [死磕Synchronized底层实现--重量级锁 #15](https://github.com/farmerjohngit/myblog/issues/15)
+6. [死磕Synchronized底层实现--重量级锁](https://github.com/farmerjohngit/myblog/issues/15)
 
 7. [源码解析-偏向锁撤销流程解读](https://blog.csdn.net/L__ear/article/details/106369509)
 
