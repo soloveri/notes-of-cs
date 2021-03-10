@@ -161,7 +161,7 @@ class ObjectMonitor {
 
 ![biased-lock](images/biased-lock.jpg)
 
-其中有几点需要注意，在一个线程每次成功获取偏向锁时，**会在当前线程的`Lock Record`队列中插入一个`Lock Record(LR)`**,并且设置新插入LR中的owner指向当前监视器对象（monitor object），具体的实现代码如下所示：
+偏向锁的**开启**需要锁对象头开启以及klass属性头开启才算，单方面无法进入重偏向。其中有几点需要注意，在一个线程每次成功获取偏向锁时，**会在当前线程的`Lock Record`队列中插入一个`Lock Record(LR)`**,并且设置新插入LR中的owner指向当前监视器对象（monitor object），具体的实现代码如下所示：
 
 ``` java
 //代码分析摘自：Synchronized 源码分析（http://itliusir.com/2019/11-Synchronized/）
@@ -194,7 +194,8 @@ CASE(_monitorenter): {
     intptr_t hash = (intptr_t) markOopDesc::no_hash;
 
     /*****************************************************/
-    // 如果锁对象的对象头标志是偏向模式(1 01)
+    // 如果锁对象的对象头标志是偏向模式,即判断锁标志为101
+
     if (mark->has_bias_pattern()) {
       uintptr_t thread_ident;
       uintptr_t anticipated_bias_locking_value;
@@ -214,7 +215,9 @@ CASE(_monitorenter): {
         }
         success = true;
       }
-      // ② 偏向模式关闭，则尝试撤销(0 01)
+      // ② 代表class的prototype_header或对象的mark word中偏向模式是关闭的
+      //又因为能走到这已经通过了mark->has_bias_pattern()判断
+      //即对象的mark word中偏向模式是开启的，那也就是说class的prototype_header不是偏向模式。
       else if ((anticipated_bias_locking_value & markOopDesc::biased_lock_mask_in_place) != 0) {
       // try revoke bias
         markOop header = lockee->klass()->prototype_header();
@@ -817,7 +820,7 @@ CASE(_monitorexit): {
 我们知道，重锁是需要一个`objectmonitor`维护互斥锁的。这个对象就是`inflate`中构建的。`inflate`主要流程如下：
 
 1. 如果锁已经达到重量级状态，则直接返回
-2. 如果是轻量级锁状态，那么则需要膨胀
+2. 如果是轻量级锁状态，那么则需要膨胀，包括设置一些record
 3. 如果锁是膨胀中状态，那么则通过**自旋**操作完成忙等待
 4. 如果是无锁状态，那么则需要进行膨胀
 
@@ -880,7 +883,7 @@ void ATTR ObjectMonitor::enter(TRAPS) {
 }
 ```
 
-在`enter()`中，只能完成三种获取锁的动作，包括无锁状态获取锁（即锁没有被占有）、轻量级锁获取锁、重入锁这三种情况。超出这三种情况，需要调用`enterI()`完成系统同步的操作。当然在调用系统同步操作之前，会尝试自旋获取锁。
+在`enter()`中，只能完成三种获取锁的动作，包括无锁状态获取锁（即锁没有被占有）、通过轻量级锁升级来获取锁、重入锁这三种情况。超出这三种情况，需要调用`enterI()`完成系统同步的操作。当然在调用系统同步操作之前，会尝试自旋获取锁。
 
 在前面说过，监视锁`objectmonitor`维护了两个队列`_EntryList`、`_WaitList`用来保存被阻塞等待锁的线程和主动调用`wait()`等待锁的线程。其实在源码中， `objectmonitor` 还维护了一个队列`_cxq`,用来给`_EntryList`提供被阻塞的线程。这三者的关系如下图所示：
 
