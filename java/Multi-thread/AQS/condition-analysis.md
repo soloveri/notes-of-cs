@@ -31,7 +31,7 @@ public final void await() throws InterruptedException {
     // 释放当前线程持有的锁
     int savedState = fullyRelease(node);
     int interruptMode = 0;
-    // 如果当前线程仍然在condition queue中，那么就主动park，知道被唤醒
+    // 如果当前线程仍然在condition queue中，那么就主动park，直到被唤醒
     while (!isOnSyncQueue(node)) {
         LockSupport.park(this);
         if ((interruptMode = checkInterruptWhileWaiting(node)) != 0)
@@ -101,7 +101,7 @@ private void unlinkCancelledWaiters() {
 
 节点入队的逻辑比较简单，如果条件队列的最后一个节点失效了，那么就会一次性剔除队列中所有的失效节点。**那么这里就出现了一个问题：`condition queue`中的节点的waitStatus什么时候会被修改成非`Node.CONDITION`？** 有人说是超时、中断会被更改，没找到啊？此问题仍待解决。
 
-当前线程找到最后一个有效节点入队后，就会使用所有持有的锁。这里为什么要指**所有**？因为有可能发生锁重入的情况。这也就是释放锁为什么叫`fullyRelease`。
+当前线程找到最后一个有效节点入队后，就会释放所有持有的锁。这里为什么要指**所有**？因为有可能发生锁重入的情况。这也就是释放锁为什么叫`fullyRelease`。
 
 ``` java
 //释放目前持有的锁，包括可重入
