@@ -207,6 +207,7 @@ private void set(ThreadLocal<?> key, Object value) {
         }
         //找到一个失效的Entry
         if (k == null) {
+            //stale是陈旧的意思
             replaceStaleEntry(key, value, i);
             return;
         }
@@ -250,7 +251,7 @@ private void replaceStaleEntry(ThreadLocal<?> key, Object value,
     Entry e;
     
     // slotToExpunge表示的含义是从当前索引值开始清理无效Entry
-    // 做法是从staleSlot开始向前找到最远离staleSlot的，Entry不为空的，并且Entry.weakReference==null的Entry索引
+    // 做法是从staleSlot开始向前，也就histaleSlot的左边，找到最远离staleSlot的，Entry不为空的，但是Entry.weakReference==null的Entry索引
     // 如果在遇到空Entry之前，还未找到失效的Entry，那么slotToExpunge将会等于staleSlot
     int slotToExpunge = staleSlot;
     for (int i = prevIndex(staleSlot, len);
