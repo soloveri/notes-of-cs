@@ -180,6 +180,7 @@ final boolean acquireQueued(final Node node, int arg) {
             final Node p = node.predecessor();
             //这里p是head的情况下还需要抢锁是因为不公平性，有可能别的线程没入队直接抢
             if (p == head && tryAcquire(arg)) {
+                //设置头节点是时会将node节点的prev设置为null
                 setHead(node);
                 //前一个获得锁的node
                 p.next = null; // help GC
@@ -225,6 +226,7 @@ private static boolean shouldParkAfterFailedAcquire(Node pred, Node node) {
         * indicate retry.
         */
         //直系前向节点不可靠，继续在前面的节点中找个好爹
+        //这一步能够将前面取消取消的节点移出队列，因为重新设置了当前节点node的prev指针
         do {
             node.prev = pred = pred.prev;
         } while (pred.waitStatus > 0);
@@ -448,7 +450,7 @@ if (pred != head) {
 
 ![cancelAcquire-p3](images/cancelAcquire-p3.drawio.svg)
 
-试想如果在`c`释放锁后，会唤醒`node`，但是`node`代表的线程执行的代码早就不会停留在获取锁的地方了，所以唤醒`node`同样会造成`node`之后的节点永远被挂起的状态。
+试想如果在`c`释放锁后，会唤醒`node`，~~但是`node`代表的线程执行的代码早就不会停留在获取锁的地方了，所以唤醒`node`同样会造成`node`之后的节点永远被挂起的状态~~，但是node的状态不符合要求，所以会从tail指针开始遍历。
 
 那么为什么有了`((ws = pred.waitStatus) == Node.SIGNAL ||
 (ws <= 0 && compareAndSetWaitStatus(pred, ws, Node.SIGNAL))`，就能够避免上述的情况？
