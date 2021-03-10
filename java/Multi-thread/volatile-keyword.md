@@ -162,7 +162,7 @@ public class NumberRange {
 }
 ```
 
-在上面的代码中，如果lower与upper初始化为(0,5)。两个线程分别调用`setLower`和`setUpper`，将（lower,upper）设置为（4，3）。这样的区间是没有意义的，之所以会出现这样的错误是因为约束条件为`value>upper`，`volatile`与`value`共同参与了不变约束。
+在上面的代码中，如果lower与upper初始化为(0,5)。两个线程分别调用`setLower`和`setUpper`，将（lower,upper）设置为（4，3），例如调用`setLower`通过if检查后，让出cpu，`setUpper`通过if检查后，继续执行，就能够成功将区间设置为（4，3）。这样的区间是没有意义的，之所以会出现这样的错误是因为约束条件为`value>upper`，`volatile`与`value`共同参与了不变约束。
 
 ## 参考文献
 
