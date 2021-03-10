@@ -291,7 +291,7 @@ private void setHeadAndPropagate(Node node, int propagate) {
 }
 ```
 
-此时propogate==0，因为是`&&`，不会执行unparkSuccssor，线程t1永远不会被唤醒，那么引入的PROPAGATE是如何解决这个问题的呢？还是采用上述相同的执行顺序：
+此时propogate==0，因为是`&&`，不会执行unparkSuccssor。当t2在释放锁时，因为head.waitStatus == 0，不会执行unpark，所以线程t1永远不会被唤醒，那么引入的PROPAGATE是如何解决这个问题的呢？还是采用上述相同的执行顺序：
 
 t1时刻: t4释放锁，调用releaseShared，执行unparkSuccssor，将head的waitStatus从-1设置0，唤醒t2
 t2时刻：线程t2执行tryAcquireShared返回0，获取锁，还未执行setHeadAndPropagate
