@@ -9,7 +9,7 @@ categories: 多线程
 
 因为线程是调度的基本单位，所以线程的状态转换与进程的状态转换是一致的。主要有五个状态：启动、就绪、执行、等待、销毁。这几个状态的转换图如下所示：
 
-![线程状态转换图](images/thread-state.drawio.svg)
+![线程状态转换图](images/java-thread-state.drawio.svg)
 
 可以看到，等待状态只能转换为就绪，再等CPU调度。这是一般的线程状态转换图。
 
