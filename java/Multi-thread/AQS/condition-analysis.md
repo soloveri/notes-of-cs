@@ -11,7 +11,7 @@ categories:
 
 `Condition`接口的功能用来实现类似于`synchronized`的await()/signal()通知机制。但是比`synchronized`的通知机制更丰富、更灵活。我们知道，`synchronized`锁内部维护了一个`waitList`保存调用了`wait()`主动释放锁的线程。AQS的`waitList`功能就是通过`Condition`内部维护的`Condition queue`实现的。
 
-与AQS的同步队列相似，`Condition queue`也是由`Node`类型的节点组成的。但是这里并没有使用`Node`的prev、next指针组成双向队列，而是通过一组额外的指针`firstWaiter`和`lastWaiter`维护了一个单向队列。`condition queue`的组成元素如下图所示：
+与AQS的同步队列相似，`Condition queue`也是由`Node`类型的节点组成的。但是这里并没有使用`Node`的prev、next指针组成双向队列，而是通过一组额外的指针`firstWaiter`和`lastWaiter`维护了一个**单向队列**。`condition queue`的组成元素如下图所示：
 
 ![condition queue](images/condition-queue.png)
 
