@@ -176,7 +176,7 @@ int select(int nfds, fd_set *rdfds, fd_set *wtfds, fd_set *exfds, struct timeval
 
 那么`select`的工作原理很简单，我们将需要监听的socket集合传入该函数后：
 
-1. `select`会将相应的socket集合**拷贝至内核空间**(注意每每次调用都会拷贝)
+1. `select`会将相应的socket集合**拷贝至内核空间**(注意每次调用都会拷贝)
 2. `select`轮循探测监听的socket，如果有对应的socket完成事件，那么`select`就会返回，否则会保持阻塞状态
 3. 那么在函数返回后，我们并不知道是哪个socket的什么事件准备好了，所以我们需要**遍历我们的socket**，依次探测所有类型的事件是否完成，不管这个socket到底对当前探测的事件是否感兴趣，并且又会把相应的socket拷贝至用户空间
 4. 在进行新一轮的`select`调用时,又得重新设置socket集合，因为上一轮已经改变了集合
@@ -207,7 +207,7 @@ int epoll_wait(int epfd, struct epoll_event * events, int maxevents, in
 
 1. epoll_create：首先调用`epoll_create`创建`poll`对象。并且会开辟一个红黑树与就绪队列。红黑树用来保存我们需要监听的socket结合，就绪队列用来保存已经准备就绪的socket集合
 2. epoll_ctl：注册要监听的事件类型。在每次注册新的事件到epoll句柄中时，会把对应的socket复制到内核中，注意对于一个socket，在`epoll`中**只会被复制一次**，不像`select`**每次调用**时都会复制。并且同时会向内核注册回调函数，大致功能是当该socket关注的事件完成时将其加入就绪队列。
-3. epoll_wait：等待事件的就绪，其只用遍历就绪队列，所以`epoll`的复杂度至于活跃的连接数有关。~~并且返回就绪socket集合**采用了内存映射**，进一步减少了拷贝fds的操作~~，好吧，这句话是错的，并没有内存映射，[参考](https://www.zhihu.com/question/39792257)。但是同时`epoll_wait`返回后，会将就绪socket对应事件清空，如果后续仍想关注当前处理的socket，那么就需要用epoll_ctl(epfd,EPOLL_CTL_MOD,listenfd,&ev)来重新设置socket fd的关注事件类型，**而不需要重新注册fd**
+3. epoll_wait：等待事件的就绪，其只用遍历就绪队列，所以`epoll`的复杂度只与活跃的连接数有关。~~并且返回就绪socket集合**采用了内存映射**，进一步减少了拷贝fds的操作~~，好吧，这句话是错的，并没有内存映射，[参考](https://www.zhihu.com/question/39792257)。但是同时`epoll_wait`返回后，会将就绪socket对应事件清空，如果后续仍想关注当前处理的socket，那么就需要用epoll_ctl(epfd,EPOLL_CTL_MOD,listenfd,&ev)来重新设置socket fd的关注事件类型，**而不需要重新注册fd**
 
 **epoll解决了什么问题：**
 
