@@ -40,7 +40,7 @@ IOC，Inversion of Control，译为控制反转。
 
 所以，依赖注入(DI)和控制反转(IOC)是从不同的角度的描述的同一件事情，就是指通过引入IOC容器，利用依赖关系注入的方式，实现对象之间的解耦。
 
-## 代码示例
+## 4. 代码示例
 
 ``` java
 public class UserServiceImpl {
@@ -74,6 +74,26 @@ public class UserServiceImpl {
 ```
 
 所以上面实现了一次控制反转，在`UserServiceImpl`中我们并**不需要知道UserDao具体的实现类是什么，如何生成的，我们只管使用**。依赖资源的生成不再由主动使用方控制，而是由第三方控制，被动地接收第三方提供的资源。这里的第三方在Spring中就是IOC容器。
+
+## 5. 使用IOC容器有什么好处？
+
+如果我们手动地实现控制反转，那么我们必须手动地写很多new，并且需要了解各个对象的构造函数，例如对于上面的`UserServiceImpl`，使用的流程一般如下：
+
+``` java
+public class Main{
+    ...main(){
+        UserDao u=new MySQLImpl();
+        UserServiceImpl i=new UserServiceImpl(u);
+    }
+}
+
+```
+
+如上所示，还是显示的使用了new，当依赖对象一旦多了起来，new的数量就会急剧增加，并且还要了解各个依赖对象的构造方法。所以IOC容器的好处就是：
+
+1. 因为采用了依赖注入，在初始化的过程中就不可避免的会写大量的new。这里IoC容器就解决了这个问题。这个容器可以自动对你的代码进行初始化，你只需要维护一个Configuration（可以是xml可以是一段代码）
+2. 我们在创建实例的时候不需要了解其中依赖资源的细节
+
 
 ## 参考文章
 
