@@ -93,6 +93,8 @@ final boolean nonfairTryAcquire(int acquires) {
 
 ### 2.1 线程的入队操作
 
+独占锁的同步队列是一个双链表，对于双链表中的节点，会使用一个额外指针指向nextWaiter指向`Node.EXCLUSIVE`（也就是null）标志当前节点是独占节点。
+
 在入队时，当前线程首先通过`addWaiter`进入同步队列,然后又调用了`accquireQueued`。这其中存在许多问题：
 
 1. `addWaiter`是怎么实现的？
