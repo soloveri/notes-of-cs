@@ -290,4 +290,6 @@ cglib代理的实现原理较复杂，目前没有时间深究，列出两篇原
 
 ## 参考文章
 
-1.[cglib的基本使用](https://objectcomputing.com/resources/publications/sett/november-2005-create-proxies-dynamically-using-cglib-library)
+1.[CREATE PROXIES DYNAMICALLY USING CGLIB LIBRARY](https://objectcomputing.com/resources/publications/sett/november-2005-create-proxies-dynamically-using-cglib-library)
+
+2. [Cglib及其基本使用](https://www.cnblogs.com/xrq730/p/6661692.html)
