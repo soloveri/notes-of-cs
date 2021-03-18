@@ -284,7 +284,7 @@ public class testCG {
 }
 ```
 
-cglib代理的实现原理较复杂，目前没有时间深究，列出两篇原理的讲解，以后有时间在学习。
+cglib代理的实现原理较复杂，目前没有时间深究，列出两篇原理的讲解，以后有时间在学习。但是有一点值得我们注意：**对于从Object中继承的方法，cglib也会进行动态代理。**
 
 1. [CGLIB入门系列三，CGLIB生成的代理类详解](https://blog.csdn.net/P19777/article/details/103998918)
 
