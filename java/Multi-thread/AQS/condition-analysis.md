@@ -271,6 +271,7 @@ public final void await() throws InterruptedException {
 
 ``` java
 private int checkInterruptWhileWaiting(Node node) {
+    //清除中断位
     return Thread.interrupted() ?
         (transferAfterCancelledWait(node) ? THROW_IE : REINTERRUPT) :
         0;
@@ -292,7 +293,7 @@ final boolean transferAfterCancelledWait(Node node) {
     * incomplete transfer is both rare and transient, so just
     * spin.
     */
-    // 为什么一定要保证节点加入了同步队列？
+    // 如果是signal先发生，为什么一定要保证节点加入了同步队列？
     // 因为如果直接返回false，后续会执行acquireQueued抢锁
     // node都未加入同步队列怎么抢？必然会发生奇怪的不可预期的事情
     while (!isOnSyncQueue(node))
@@ -350,9 +351,9 @@ public final void await() throws InterruptedException {
     if (acquireQueued(node, savedState) &&
     /*
     * acquireQueueed返回true表示在抢锁过程中发生了中断了，
-    * 如果没有后半部分的判断条件，那么原来可能interruptMode=THROW_IE,THROW_IE,在await结束后
-    * 需要抛出中断异常，但是interruptMode被覆盖为REINTERRUPT
-    * 这样仅仅只会重新设置中断位，丢失了原本需要抛出的中断异常
+    * 如果没有后半部分的判断条件，那么原来可能interruptMode=THROW_IE,THROW_IE在await结束后
+    * 需要抛出中断异常，但是因为在抢锁的过程中又发生了中断，没有后半部分的条件
+    * interruptMode被覆盖为REINTERRUPT这样仅仅只会重新设置中断位，丢失了原本需要抛出的中断异常
     */
     interruptMode != THROW_IE)
         interruptMode = REINTERRUPT;
@@ -379,6 +380,13 @@ private void reportInterruptAfterWait(int interruptMode)
         selfInterrupt();
 }
 ```
+
+我认为需要再对条件语句`if (acquireQueued(node, savedState) && interruptMode != THROW_IE)`做一下说明，一旦一个线程被唤醒：
+
+1. 如果中断先于`signal`发生，那么不管在抢锁的过程中有没有发生中断，因为if的后半部分的条件无法通过，最后的结果就是抛出中断。if的后半个条件就是为了处理此类情况，避免了中断被覆盖
+2. 如果`signal`先于中断发生，如果抢锁的过程中发生了中断，那么无论后半部分的条件是否通过，都不会影响最后设置中断位的结果
+
+无论是因为中断还是`signal`谁先发生，唤醒后都会转移到同步队列抢锁，**抢到锁才会考虑后续是否需要补一个中断异常。**
 
 ## 总结
 
