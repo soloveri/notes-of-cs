@@ -745,3 +745,5 @@ JUC中提供了四种基于`ThreadPoolExecutor`的内置线程池：
 ## 参考文章
 
 1. [Java多线程进阶（三九）—— J.U.C之executors框架：executors框架概述](https://segmentfault.com/a/1190000016586578)
+
+2. [Java并发之ThreadPoolExecutor源码解析（三）](https://javamana.com/2021/02/20210228205934972L.html)
