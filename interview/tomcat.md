@@ -7,19 +7,23 @@
 
 在项目经验方面，主要分为两部分：
 
-第一部分是因为我想深入了解一下web服务器到底是如何工作的，我自己完成了一个具备servlet容器功能的web服务器，对于一个servlet容器的核心功能都进行了实现，能够处理一般的http的请求
+第一部分是因为我想深入了解一下web服务器到底是如何工作的，所以我自己完成了一个具备servlet容器功能的web服务器，对于一个servlet容器的核心功能都进行了实现，包括servlet的完整生命周期、重定向与内部转发、cookie与session，调用用户servlet处理的http的请求
 
-第二部分是参与了实验室的一个大课题，跟其他组员完成了一些APT组织恶意样本分析，我主要负责DarkHotel、GreenSpot，并对一些通用函数（包括字符串加解密、程序自启动、手机信息这三个类别）进行了代码重构与复用，并编译成静态库供病毒开发使用，最后为整个项目开发了一个恶意代码上下载的原型系统
+第二部分是参与了实验室的一个大课题，跟另外一个组员完成了一些APT组织恶意样本分析，我主要负责DarkHotel、GreenSpot，并对一些通用的木马功能函数（包括字符串加解密、程序自启动、手机信息这三个类别）进行了代码重构与复用，并编译成静态库供病毒开发使用，最后为整个项目开发了一个恶意文件上下载的原型系统
 
 ## 1.tomcat
 
+### 为什么要参考tomcat？
+
+### 为什么要实现一个servlet的容器？
+
 ### 基本功能
 
-web服务器实现了servlet的完整声明周期，同时包含用于处理http请求的核心功能，包括cookie与session、http的重定向与内部跳转，自定义类加载器、过滤器，支持多端口多应用部署，
+web服务器实现了servlet的完整声明周期，同时包含用于处理http请求的核心功能，包括cookie与session、http的重定向与内部跳转，自定义类加载器、过滤器，支持多端口多应用部署。
 
 ### 整体架构
 
-包括server、service、connector、engine、host、context这6个核心组件
+servlet容器总共由六个组件构成，分别是：server、service、connector、engine、host、context这6个核心组件
 
 1. Server元素在最顶层，代表整个Tomcat容器，因此它必须是server.xml中唯一一个最外层的元素。一个Server元素中可以有一个或多个Service元素。
 
@@ -58,11 +62,10 @@ web服务器实现了servlet的完整声明周期，同时包含用于处理http
 初始化需要的注意点：
 
 1. 这里采用的是由外到内的初始化各个组件：
-
-- service启动各个connector，这里采用的方法是将connector包装成一个线程，一直监听目标端口
-- 其中Engine要负责维护一个defaultHost，用来处理没有找到合适host的请求
-- host需要扫描默认目录下（也就是webapps）的所有war包以及文件夹，为每一个应用初始化context
-- 其中context的初始化是核心，通过加载当前web应用的web.xml文件（与tomcat类似，为web应用设置了一个默认的web.xml相对路径（context.xml），一般就是/WEB-INF/web.xml，在配置context，都会配置web应用的虚拟路径和绝对路径映射，只需要将web应用的绝对路径和xml的相对路径拼接起来即可）要负责检查servlet配置（主要是检查url的映射是否重复）、初始化过滤器、初始化所有servlet的初始参数、**初始化当前应用的webappClassLoader**、servletContext以及监听器listener
+    - service启动各个connector，这里采用的方法是将connector包装成一个线程，一直监听目标端口
+    - 其中Engine要负责维护一个defaultHost，用来处理没有找到合适host的请求
+    - host需要扫描默认目录下（也就是webapps）的所有war包以及文件夹，为每一个应用初始化context
+    - 其中context的初始化是核心，通过加载当前web应用的web.xml文件（与tomcat类似，为web应用设置了一个默认的web.xml相对路径（context.xml），一般就是/WEB-INF/web.xml，在配置context，都会配置web应用的虚拟路径和绝对路径映射，只需要将web应用的绝对路径和xml的相对路径拼接起来即可）要负责检查servlet配置（主要是检查url的映射是否重复）、初始化过滤器、初始化所有servlet的初始参数、**初始化当前应用的webappClassLoader**、servletContext以及监听器listener
 
 2. 各个组件必须不能添加到AppClassLoader的classpath中，因为这些组件是需要通过CommonClassLoader来加载的，所以这里的解决办法与tomcat类似，写了个脚本，将这些组件打包成一个jar包，然后让commonCLassLoader负责加载容器的所有jar包，包括自己的和引用的，具体实现是将lib下的所有包都加入CommonClassLoader的classpath路径下。仅让AppClassLoader负责加载启动类和CommonClassLoader
 
@@ -76,19 +79,20 @@ web服务器实现了servlet的完整声明周期，同时包含用于处理http
 
 那么我对应的具体流程就是：
 
-1. Connector一直监听指定的端口，当socket接受请求后，Connector负责为本次请求分配线程交由HttpProcessor（代理engine）处理，子线程的任务包括：
+1. Connector一直监听指定的端口，当socket接受请求后，Connector负责为本次请求分配线程，线程的任务包括：
 
 - 为本次请求构造request与response对象
-- 根据request对象获得session
-- 根据uri查找对应的过滤器，在过滤链执行完毕后，调用servlet进行处理
-- 最后根据状态响应码调用对应的处理方法
+- 将这两个对象交由HttpProcessor（代理engine）处理，engine的操作包括：
+    + 为当前请求准备session、准备过滤器，准备能够处理当前请求的servlet
+    + 调用过滤链，最后执行目标servlet
+    + 最后根据状态响应码调用对应的处理response对象方法
 
 构造request对象是处理请求的重要一个步骤，包括：
-    - 读取socket，解析uri、请求类型
-    - 解析应用上下文context（这里直接通过engine的defaultHost获取当前应用名对应的context），通过uri匹配当前host维护的contextMap
-    - 解析请求参数
-    - 解析http头部的信息，例如content-type、压缩类型等等
-    - 解析cookie
+
+- 读取socket，解析uri、解析请求类型、解析请求参数
+- 解析应用上下文context（这里直接通过engine的defaultHost获取当前应用名对应的context），通过当前host维护的contextMap匹配uri
+- 解析http头部的信息，例如content-type、压缩类型等等
+- 解析cookie
 
 ### servlet的声明周期
 
@@ -99,14 +103,12 @@ servlet的完整声明周期包括：初始化单例servlet，servlet提供服�
 
 ### cookie与session
 
-对于cookie，我实现的方法是，对于一个response对象，其维护了一个cookie列表，当用户的servlet想添加cookie时，只需往list中添加即可，最后在生成响应报文时，只需要将cookie添加到响应头中，
+对于cookie，我实现的方法是，对于一个response对象，其维护了一个cookie列表，当用户的servlet想添加cookie时，只需往response对象的list中添加即可，最后在生成响应报文时，只需要将cookie添加到响应头中，
 一个cookie占一行，对于每一个cookie的格式是：Set-Cookie: name=value;Expires=;Path=;
 
-对于session，我处理的位置是在httpProcessor分配线程之后，首先查找cookie有没有对应的session name，我这里维护了一个全局sessionMap，如果map中存在，那么将session提取出来，并重新设置为session服务的cookie过期时间。
+对于session，engine，首先会查找当前request对象中的cookie有没有对应的session name，我这里维护了一个全局sessionMap，如果map中存在，那么将session提取出来，并重新设置为session服务的cookie过期时间。
 
 对于sessionMap，我提供了一个守护线程负责清除map中过期的session。逻辑很简单，就是判断最后一次访问的时间与当前时间的间隔。对于sessionMap过期的时长，可以在配置文件中设置
-
-并且提供了守护线程负责清除sessionMap中的过期session。
 
 ### 解析http
 
@@ -114,25 +116,23 @@ servlet的完整声明周期包括：初始化单例servlet，servlet提供服�
 
 而http响应包与请求包类似，第一行是：\[http协议版本] \[状态码] \[对状态码的描述]，接下来每一行都是请求头的信息，直到出现空白行，之后就是响应体
 
-主要解析的就是请求方法类型与uri。对于get，会从url中提出请求参数、应用名称、访问uri，然后根据uri查找对应的servlet进行处理。这里的查找我提供了**三类单例servlet**负责提供用户访问的servlet对象并调用。三类分别是：
+主要解析的就是请求方法类型、uri以及请求参数。对于get，会从url中提出请求参数、应用名称、获得uri后，engine会查找对应的servlet进行处理。这里的查找我提供了**三类单例servlet**负责提供用户访问的servlet对象并调用。三类分别是：
 
 - 处理普通的servlet
 - 处理jsp对应的servlet
 - 处理静态资源
 
-在每次处理前，都会执行过滤器、获取session
-
 ## 重定向与内部跳转
 
-重定向就是调用response对象sendRedirect
+如果用户调用了sendRedirect设置重定向路径时，engine会设置状态响应码为302，最后在传输response对象时，会检查它的状态码，如果为302，会向客户端发送302的http数据包
 
-跳转传参就是设置request属性
+跳转传参我实现的方法是，在request对象中维护了一个attributeMap，我们只需要将属性添加这个map，然后将request对象在不同的servlet进行传递即可。
 
-内部跳转就是forward，这里处理的方式相当于重新把此次请求发送给tomcat，走一遍servlet分发、过滤的流程
+内部跳转就是使用request生成一个RequestDispatcher对象，并在该对象中设置跳转路径，然后调用dispatcher对象forward进行内部跳转，具体的处理方法就是首先需要重新设置request对象的uri，然后直接转发给engine组件来处理请求，engine会根据uri匹配对应的servlet
 
 ## 过滤器
 
-对于一个请求的过滤器，我们需要维护一个filterChain用来存储当前uri匹配的所有filter，依次执行chain中的所有过滤器
+对于一个请求的过滤器，我们需要维护一个filterChain用来存储当前uri匹配的所有filter，依次执行chain中的所有过滤器，最后filterchain会执行我们的目标servlet
 
 ## 编译Servlet
 
@@ -172,3 +172,16 @@ tomcat的用户权限认证没有实现，集群设置没有实现，servlet的w
 对于测试的话：就是常规意义上的功能测试，首先第一步就是需求分析阶段，了解需要测试什么；第二部是设计测试用例，这一步的目的是达到怎么测；第三步是进行具体测试，这一步是找到具体的bug；最后一步是总结修复
 
 对于开发的话，我认为主要是完成自动化测试与测试工具的开发
+
+## tomcat有哪些IO模型？
+
+Tomcat支持三种接收请求的处理方式：BIO、NIO、APR 。
+
+BIO
+阻塞式I/O操作即使用的是传统 I/O操作，Tomcat7以下版本默认情况下是以BIO模式运行的，由于每个请求都要创建一个线程来处理，线程开销较大，不能处理高并发的场景，在三种模式中性能也最低。
+
+NIO
+NIO是Java 1.4 及后续版本提供的一种新的I/O操作方式，是一个基于缓冲区、并能提供非阻塞I/O操作的Java API，它拥有比传统I/O操作(BIO)更好的并发运行性能。tomcat 8版本及以上默认就是在NIO模式下允许。
+
+APR
+APR(Apache Portable Runtime/Apache可移植运行时)，是Apache HTTP服务器的支持库。你可以简单地理解为，Tomcat将以JNI的形式调用Apache HTTP服务器的核心动态链接库来处理文件读取或网络传输操作，从而大大地提高Tomcat对静态文件的处理性能。 Tomcat apr也是在Tomcat上运行高并发应用的首选模式。
