@@ -757,6 +757,11 @@ public void main(){
 
 在运行时我们可以获取引用`test`中的泛型类型，而不能获得`test.a`的泛型类。因为`test.a`在运行时会被泛化为`object`类型，无法通过class文件获取类型。但是对于`test`来说，因为在编译的时候编译器会将`test`泛型的声明类型作为`Signature`属性保存在`action`类的class文件中，所以我们可以通过`action.class`获取它的泛型声明类型。
 
+**参考文献**
+
+1. [深入探索Java泛型的本质 | 泛型](https://www.itzhai.com/articles/exploring-the-nature-of-java-generics.html)
+2. [Java中的泛型会被类型擦除，那为什么在运行期仍然可以使用反射获取到具体的泛型类型？](https://www.zhihu.com/question/346911525)
+
 ## 参考文献
 
 
