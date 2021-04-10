@@ -43,6 +43,7 @@ class C <? extends Number>{
     void add(?);
 }
 ```
+
 这显然是毫无意义的,但是我们知道实例化类时一定会使用一个具体的类型X\:\< Number( **:<** 表示前者继承于后者),尽管我们不知道这个X到底是什么类型的。这并不重要。那么被具体类型X实例化的类C长下面这样:
 
 ``` java
@@ -52,6 +53,7 @@ class C<X>{//X:<Number
     void add(X);
 }
 ```
+
 使用一个具有名字的类型比使用通配符`?`容易多了。所以编译器也是这么做的。只不过编译器并不会使用`X`,而是随机使用一个数字,例如`#337`表示上面这个通配符。所以才会有了这句`capture#337 of ?`。即编译将遇到这个统配符`?`分配了一个名字叫做`#337`。
 
 当一个`value`的类型是通配符类型,编译器会使用类型变量替换这个`value`种存在的通配符`?`(类型变量中的数字按序增长),这种操作名为`capture conversion`,通过这个操作,编译器只需要处理带有具体类型的对象。
@@ -90,15 +92,19 @@ List<? extends Number> foo(List<? extends Number> numberList)
 对于`#4`处的`numberList`,编译器同样会转换为`List<X4>`后返回。
 
 上面的转换规则非常重要,我们再来看一个难一点的例子。现在有一个map,类型为`Map<?,?> map`,那么如果进行如下操作是合法的:
+
 ``` java
 for(Entry<?,?> entry : map.entrySet())
 ```
+
 因为`map`会被转型为`Map<X1,X2>`类型,那么返回的entrySet就是`Set<Entry<X1,X2>>`,因为`X1<:?`,`X2<:?`,所以将`Entry<X1,X2>`类型赋值给`Entry<?,?>`类型是合理的。但是下面的操作就非法了
 
 ``` java
 Set<Entry<?,?>> entrySet = map.entrySet(); // compile error
 ```
+
 很简单,错误原因是因为泛型不是协变的,`Set<Entry<X1,X2>>`不是`Set<Entry<?,?>>`的子类。比较笨拙的办法是在定义一个`wild type`,如下所示:
+
 ``` java
 Set<? extends Entry<?,?>> entrySet=map.entrySet();
 ```
@@ -132,6 +138,7 @@ void bar(List<? extends Number> numberList)
     list.add(number);
 }
 ```
+
 然后我们就可以调用`bar(numberList)`解决上面每个`numberList`类型不一样的问题。方法`bar2`就叫做`capture helper`。
 
 那么`capture helper`的出现有什么意义呢?
@@ -191,6 +198,7 @@ class List<?>{
     void add(? elem){}
 }
 ```
+
 在前面曾经说过,由于`capture conversion`的原因,编译器会把每一个类型是`wild type`的value中的通配符`?`赋一个名字,例如像下面这样:
 
 ``` java
@@ -199,6 +207,7 @@ class List<X1>{
     void add(X3 elem){}
 }
 ```
+
 那么我们在实例化List的时候,像`List<String>`这样?那么`get`的返回值类型又是什么?这样就违背了我们使用`?`定义泛型类的初衷。我们的本意是`List`接受一个不知道是什么类型的类型参数(unkown type),并且想要`get`的返回值类型也是同一个`unknown type`。但是这很显然不可能。
 
 **所以通配符`?`就不能用来定义一个类型变量(type variable),它只能用在类型声明的地方**,例如声明方法的形参类型,声明一个变量。因为 **?不是一个有效的变量名,不是一个有效的标识符**:
@@ -206,8 +215,8 @@ class List<X1>{
 >You can't name a generic parameter as ?, because ? is not a valid identifier - a valid name of a variable. 
 You have to give a generic parameter a valid java name so you can refer to it in the implementation.
 
-
 下面是通配符常用的地方:
+
 ``` java
 List<?> list;//ok,声明变量类型
 void add(List<? extends Number> list);//ok,声明参数类型
@@ -238,6 +247,7 @@ public void test(MyList<? extends Number> myList){}
 //定义了一个MyList<T>的变量,使用?填充T
 MyList<?> myList;//
 ```
+
 **参考文献:**
 
 1. [java Generic wildcard “?”](https://stackoverflow.com/questions/24740590/java-generic-wildcard?rq=1)
@@ -286,10 +296,10 @@ void m3(List<String> list) {
   ...
 }
 ```
+
 注意上面抛出异常的位置,不是在我们进行类型转换的位置,而是在我们提取元素的时候。这种没有在正确地方抛出的异常是我们非常不愿意看到的。所以为了引起我们对这种潜在的类型不安全的转换注意,编译器产生了"unchecked"警告在遇到可疑的转换时。
 
 所以,**编译器在每一处目标类型是参数化类型并且是向下转型的地方,都会产生一个unchecked警告**。
-
 
 ## 7.泛型中哪里会出现的"unchecked"警告?
 
@@ -299,11 +309,9 @@ void m3(List<String> list) {
 
 3. 如果字段的类型因为类型擦除而改变,那么对该字段赋值就会产生"unchecked",但是读取该字段的值却不会产生任何问题
 
-
 ## 8. unbound wildcard parameterized type和raw type有什么区别?
 
 其实这二者没有太大区别,二者都可以被视作是任何参数化类型的超级类,并且二者都是`reifiable types`。所以这两种类型可以作为数组的元素类型(注意是unbound wildcard而不是wildcard)。但是编译器对`unbound wildcard parameterized type`更严格。对于同样的操作,如果`raw type`产生了`unchecked`警告,那么`unbound wildcard parameterized type`则会产生编译错误。
-
 
 ## 9. 泛型真的不能使用instance of吗?
 
@@ -388,8 +396,8 @@ class MyClass implements Comparable <?> { // error
   public int compareTo( ??? arg) { ... }
 }
 ```
-编译器无法知道`comapreTo`方法到底接受的是什么类型的参数,很奇怪。而且,如前面所说,因为有`capture conversion`操作,这样的定义是没有任何意义的。
 
+编译器无法知道`comapreTo`方法到底接受的是什么类型的参数,很奇怪。而且,如前面所说,因为有`capture conversion`操作,这样的定义是没有任何意义的。
 
 ## 15. 具体化参数类型不能做什么?
 
@@ -399,11 +407,10 @@ class MyClass implements Comparable <?> { // error
 2. 不能创建数组
 3. 不能用于异常处理(泛型都不行)
 
-
 ## 14. 泛型不能做什么?
 
 1. 不能在静态字段中使用类型参数(type paramemter):**因为type parameter不适用于静态上下文环境**,所以泛型不能适用于静态泛型字段,例如`static T member`、`static List<T> list`
-2. 不用如此使用：` obj instanceof T`,因为类型擦除的原因
+2. 不用如此使用：`obj instanceof T`，因为类型擦除的原因
 
 
 
