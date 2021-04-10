@@ -467,7 +467,7 @@ public static <T> void copy(List<? super T> dest, List<? extends T> src) {
 
 ### 3. 泛型的擦除
 
-在最开始曾说到java的泛型是**伪泛型**,仅仅保持在编译层面。在生成字节码文件时会对泛型擦除,将参数类型(parameterized types)转为原始类型(raw types)。所谓的参数类型就是类似于`class Person<T>`这种,而将它转换为原始类型就是`class Pseron`。在这种机制下,java中的多态就比较奇妙了。
+在最开始曾说到java的泛型是**伪泛型**,仅仅保持在编译层面。在生成字节码文件时会对泛型擦除,将参数类型(parameterized types)转为原始类型(raw types)。所谓的参数类型就是类似于`class Person<T>`这种,而将它转换为原始类型就是`class Pseron`。在这种机制下，java中的多态就比较奇妙了。
 
 #### 3.1 泛型下的多态
 
@@ -532,9 +532,11 @@ public class Person {
     }
 }
 ```
+
 所以按道理,`Student`类中的`String`类型也应该变成`Object`类型,这样一来,不是全乱套了?所以java为了解决这个问题,发明了一种桥方法的机制。
 
 可以看到,`Student`类中的`getName`和`setName`和`Person`类中的`getName`和`setName`参数类型根本就不一样,所以这根本就不是重载。但是代码又可以编译通过并且实现多态的特性。奇怪的事情发生了。我们看看`Studnet`编译后的字节码:
+
 ``` java
 // access flags 0x1
   public getName()Ljava/lang/String;
@@ -594,8 +596,6 @@ public class Person {
 有两个`setName`,两个`getName`可以看到其中有一组`setName`和`getName`前面有修饰符`synthetic`和`bridge`。`synthetic`表示这是系统自动生成的,而`bridge`表示这是一个桥方法。
 
 所以其实桥方法才真正是`override`了`Person`类中的两个方法。而桥方法又去调用了我们自定义的`setName`与`getName`完成了多态。
-
-
 
 #### 3.2 泛型下的继承
 
@@ -679,9 +679,11 @@ class Student<T,E> extends Person<E>{
     }
 }
 ```
+
 那么在子类中从父类继承而来的东西,类型还是`E`,类型参数`T`与父类没有任何关系。
 
 **父类进行了泛型擦除而子类没有:**
+
 ``` java
 class Student<T> extends Person{
     T age;
@@ -725,11 +727,35 @@ class Student extends Person{
     }
 }
 ```
+
 子类与父类都进行了擦除这么说并不准确,因为根本就没有定义子类的类型参数...规则和父类擦除而子类不擦除的规则一样。要看父类的类型参数有没有上限,因为编译器的推断类型是不一样的。
 
 **那么为什么不能父类不擦除,而子类不擦除呢？**
 
 因为继承泛型类时,子类必须对父类中的类型参数进行初始化,当然父类擦除或者由子类指定都可以。所以子类擦除而父类不擦除,父类中的类型参数由谁来初始化?
+
+#### 3.3 泛型下的类型获取
+
+上面曾说到，Java中的泛型是伪泛型，在编译时会被擦除为`Object`类型的，但是为什么又能够在运行时获取的泛型的真实类型呢？
+
+首先我们需要知道一个逻辑：**泛型擦除并不代表JVM不知道类型信息**。对于泛型类，JVM可以从Class文件中的`Signature`属性来获取泛型类的**声明**类型，而不是实际类型。假设有代码如下：
+
+``` java
+public class action<T>{
+    T a;
+    public void set(T a){
+        this.a=a;
+    }
+    public T get(){
+        return a;
+    }
+}
+public void main(){
+    action<Integer> test=new action<>();
+}
+```
+
+在运行时我们可以获取引用`test`中的泛型类型，而不能获得`test.a`的泛型类。因为`test.a`在运行时会被泛化为`object`类型，无法通过class文件获取类型。但是对于`test`来说，因为在编译的时候编译器会将`test`泛型的声明类型作为`Signature`属性保存在`action`类的class文件中，所以我们可以通过`action.class`获取它的泛型声明类型。
 
 ## 参考文献
 
