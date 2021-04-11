@@ -112,7 +112,7 @@ private E get(Object[] a, int index) {
 }
 ```
 
-迭代器遍历的方式还稍微有趣一点，`CopyOnWriteList`的迭代器会对当前内部数组做一个快照，所谓的快照并不是指真正的复制一份，而是持有一个旧数组的引用，在逻辑上做了一个“snapshot”。如下所示：
+迭代器遍历的方式还稍微有趣一点，`CopyOnWriteList`的迭代器会对当前内部数组做一个快照，所谓的快照并不是指真正的复制一份，而是持有一个旧数组的引用，在逻辑上做了一个“snapshot”，所以不会抛出`ConcurrentModificationException`，**但是仍然不支持在迭代器修改**。如下所示：
 
 ``` java
 public Iterator<E> iterator() {
