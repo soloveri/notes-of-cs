@@ -1,8 +1,8 @@
 ---
-title: CopyOnWriteList分析
+title: CopyOnWrite容器分析
 mathjax: true
 data: 2021-04-10 21:39:01
-updated:
+updated: 2021-04-11 15:10:19
 tags:
 - concurrent collections
 categories:
@@ -11,11 +11,15 @@ categories:
 
 ## 1. 预备知识
 
-`CopyOnWriteList`是`ArrayList`线程安全的版本。所有更改`CopyOnWriteList`内容的操作都基于`CopyOnWrite`。所谓的`CopyOnWrite`，字如其名，就是说只在更改list内容时，才会对内部数组加锁，将更改后的内容复制到新数组，最后再赋值给list内部的数组。本篇文章将从`CopyOnWriteList`的构造、添加、删除、查询四个方面来分析。
+`J.U.C`包提供了两种copy-on-wirte容器：`CopyOnWriteList`与`CopyOnWriteSet`。不了解copy-on-write技术的，可以去看[理解 Copy On Write 技术](http://wsfdl.com/algorithm/2016/09/29/Copy_on_write.html)。
 
-## 2. 架构解析
+`CopyOnWriteList`是`ArrayList`线程安全的版本。所有更改`CopyOnWriteList`内容的操作都基于copy-on-write，对于同一个元素，插入操作happens before读取操作。而`CopyOnWriteSet`与我们常见的set不同，它内部不是通过计算hash值找到对应的元素，而是内部维护了一个`CopyOnWriteList`。
 
-`CopyOnWriteList`的继承体系比较简单，实现了`utils`包下的`List`接口，并支持随机访问、序列化、克隆等功能，继承关系如下所示：
+本篇文章将分别解析`CopyOnWriteList`和`CopyOnWriteSet`。
+
+## 2. CopyOnWriteList解析
+
+了解一个类，第一步应该是学习它的继承体系。`CopyOnWriteList`的继承体系比较简单，实现了`utils`包下的`List`接口，并支持随机访问、序列化、克隆等功能，继承关系如下所示：
 
 ![CopyOnWriteList-arch](./images/CopyOnWriteList-arch.png)
 
@@ -25,7 +29,7 @@ categories:
 
 一般我们关注是独占锁与内部数组。内部数组是真正存储元素的地方，而独占锁保证了各线程互斥地访问。
 
-### 2.2 添加 
+### 2.1 添加操作
 
 `CopyOnWriteList`的增加逻辑主要由`add`方法完成，对于每次添加，都会上锁，否则会造成多个线程同时添加时复制出多份原数组。我这里就不细说了，下面的代码一看就懂：
 
@@ -52,7 +56,7 @@ public boolean add(E e) {
 }
 ```
 
-### 2.3 删除
+### 2.2 删除操作
 
 对于删除逻辑，其实和添加逻辑差不多。第一步先上锁，然后删除目标元素，最后再将剩余元素拷贝到新数组中，代码如下所示：
 
@@ -89,7 +93,7 @@ public E remove(int index) {
 }
 ```
 
-### 2.4 查询
+### 2.3 查询操作
 
 查询可以通过两种方法：
 
@@ -134,7 +138,30 @@ static final class COWIterator<E> implements ListIterator<E> {
 }
 ```
 
-## 3. 总结
+## 3. CopyOnWriteSet解析
+
+`CopyOnWriteSet`通过内部维护的`CopyOnWriteList`实现了copy-on-write，如下所示：
+
+``` java
+public class CopyOnWriteArraySet<E> extends AbstractSet<E>
+        implements java.io.Serializable {
+    private static final long serialVersionUID = 5457747651344034263L;
+
+    private final CopyOnWriteArrayList<E> al;
+
+    /**
+     * Creates an empty set.
+     */
+    public CopyOnWriteArraySet() {
+        al = new CopyOnWriteArrayList<E>();
+    }
+    ...
+}
+```
+
+那么`CopyOnWriteSet`的插入、查询、操作完全依赖`CopyOnWriteList`。根本没有用到哈希的概念，所以这里就不再赘述了。
+
+## 4. 总结
 
 CopyOnWriteArrayList的思想和实现整体上还是比较简单，它适用于处理“读多写少”的并发场景。通过上述对CopyOnWriteArrayList的分析，读者也应该可以发现该类存在的一些问题：
 
@@ -143,6 +170,8 @@ CopyOnWriteArrayList的思想和实现整体上还是比较简单，它适用于
 
 2. 数据一致性
 CopyOnWriteArrayList只能保证数据的最终一致性，不能保证数据的实时一致性——读操作读到的数据只是一份快照。所以如果希望写入的数据可以立刻被读到，那CopyOnWriteArrayList并不适合。
+
+而CopyOnWriteSet因为内部维护了CopyOnWriteList，所以二者的优缺点差不多。
 
 ## 参考文章
 
