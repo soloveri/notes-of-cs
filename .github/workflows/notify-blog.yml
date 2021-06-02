@@ -13,7 +13,7 @@ env: # 设置环境变量
   NOTE_BRANCH: master
   BLOG_REPO: soloveri/blog
   BLOG_BRANCH: master
-  NOTIFY_FILE: date.txt
+  NOTIFY_FILE: NOTIFY
 
 jobs:
   update_date:
@@ -21,8 +21,8 @@ jobs:
     steps:
 
     - name: save current date
-    run: |
-      date > ${{ env.NOTIFY_FILE }}   
+      run: |
+        date > ${{ env.NOTIFY_FILE }}
 
     - name: Pushes date file
       uses: dmnemec/copy_file_to_another_repo_action@main
