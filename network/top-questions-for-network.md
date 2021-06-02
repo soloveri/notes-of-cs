@@ -34,15 +34,18 @@ dns解析的流程比较简单，查询步骤如下：
 3. 查询**本地dns服务器**（一般是指由用户设置的dns服务器），如果失败，如果采用迭代模式，则执行4；如果采用递归模式，则执行5
 
 4. 本地dns服务器采用递归模式的查询流程如下所示：
-![dns-recursive](images/dns-recursion.png)
+
+![top-questions-for-network.dns-recursion](https://eripe.oss-cn-shanghai.aliyuncs.com/img/top-questions-for-network.dns-recursion.png)
 
 5. 本地dns采用迭代模式的查询流程如下所示：
-![dns-iteration](images/dns-iteration.png)
+
+![top-questions-for-network.dns-iteration](https://eripe.oss-cn-shanghai.aliyuncs.com/img/top-questions-for-network.dns-iteration.png)
 
 6. 返回域名对应的ip地址
 
 上图中所谓的根服务器的概念与域名的级别有关系，根服务器负责管理13个顶级域名服务器，如下图所示：
-![root-domain](images/root.png)
+
+![top-questions-for-network.root](https://eripe.oss-cn-shanghai.aliyuncs.com/img/top-questions-for-network.root.png)
 
 ---
 
@@ -133,7 +136,7 @@ EGP运行于AS之间，代表协议主要包括EGP、BGP（EGP的升级版）、
 
 tcp连接的建立需要经过三次握手，如下图所示：
 
-![three-handshake](images/tcp-three-handshake.png)
+![top-questions-for-network.tcp-three-handshake](https://eripe.oss-cn-shanghai.aliyuncs.com/img/top-questions-for-network.tcp-three-handshake.png)
 
 1. 客户发送的第一个段是 SYN 段。这个段仅有 SYN 标志被置位，它用于序号同步。**它占用一个序号，不能携带数据**。当数据传输开始时，客户**随机**选择一个数字作为初始序号(ISN)。注意，这个段不包含确认号。它也没有定义窗口大小；窗口大小的定义只有当段包含确认号时才有意义。
 &nbsp;
@@ -164,7 +167,7 @@ ACK：谁收到了数据包，谁就要设置ACK标志位
 
 那么握手到底是啥意思？我认为所谓的握手是指：对于一个**数据包**来说，它经历了一组收发的过程，就叫一次握手。如下图所示：
 
-![what-is-a-handshake](images/tcp-handshake.drawio.svg)
+![what-is-a-handshake](https://eripe.oss-cn-shanghai.aliyuncs.com/img/tcp-handshake.drawio.svg)
 
 明白了**连接**和**握手**的概念，我们再来讨论握手的次数。因为tcp是双工的，收方和发方都是可以发送信息的，所以就需要为收发两端同步上述的状态信息，而**两次握手都不能完成同步信息(主要是序列号ISN)的任务**。如何理解？
 
@@ -177,11 +180,11 @@ ACK：谁收到了数据包，谁就要设置ACK标志位
 
 那么为什么三次握手就能解决这个问题呢？其实我们可以把三次握手退化成四次握手，如下图所示：
 
-![two-handshake](images/tcp-four-handshake.drawio.svg)
+![four-handshake](https://eripe.oss-cn-shanghai.aliyuncs.com/img/tcp-four-handshake.drawio.svg)
 
 经过四次握手后，主机A和主机B都确认对方能够收到数据，就会建立tcp连接。如果此时再出现A发送的连接请求超时到达，B不会建立连接，而是向A发送应答请求，并且试图同步序列号，如果同步失败，连接就不会建立，主机A和B都能很快的释放资源。但是其中数据包2、3是可以一起发送的。四次就退化成三次握手，如下所示：
 
-![three-handshake](images/tcp-three-handshake.png)
+![top-questions-for-network.tcp-three-handshake](https://eripe.oss-cn-shanghai.aliyuncs.com/img/top-questions-for-network.tcp-three-handshake.png)
 
 图中三次握手的重点就是**同步序列号**，序列号之所以如此重要，是因为它能够防止以下情况出现：
 
@@ -290,41 +293,40 @@ tls最终会基于这三个部分计算最终的master key。其中前两个随�
 
 tls的握手流程如下所示：
 
-![tls-workflow](images/tls-workflow.drawio.svg)
+![tls-workflow](https://eripe.oss-cn-shanghai.aliyuncs.com/img/tls-workflow.drawio.svg)
 
 接下来我们根据抓取访问淘宝的数据包来分析上图的各个阶段，我访问的ip地址为`140.205.94.189`，实际的握手数据包如下所示：
 
-![taobao-tls](images/taobao-tls.png)
+![top-questions-for-network.taobao-tls](https://eripe.oss-cn-shanghai.aliyuncs.com/img/top-questions-for-network.taobao-tls.png)
 
 **A. Client Hello**
 
 该阶段就是客户端向服务器发起tls认证，向客户端发送了第一个随机数，,并声明客户端支持的算法套件。内容如下图所示：
 
-![client-hello](images/client-hello.png)
+![top-questions-for-network.client-hello](https://eripe.oss-cn-shanghai.aliyuncs.com/img/top-questions-for-network.client-hello.png)
 
 **B. Server hello**
 
 该阶段确定了密钥算法，并向客户端发送了第二个随机数，如下图所示：
 
-![server hello](images/server-hello.png)
-
+![top-questions-for-network.server-hello](https://eripe.oss-cn-shanghai.aliyuncs.com/img/top-questions-for-network.server-hello.png)
 **C. Certificate**
 
 该阶段将服务器的证书发送给客户端验证，如下图所示：
 
-![certificate](images/certificate.png)
+![top-questions-for-network.certificate](https://eripe.oss-cn-shanghai.aliyuncs.com/img/top-questions-for-network.certificate.png)
 
 **D. Server key Exchange**
 
 该阶段服务器会选择好a、p两个参数（这里的协商算法基于ECDH），并计算出Ys发送给客户端，如下图所示：
 
-![server key](images/server-key-exchange.png)
+![top-questions-for-network.server-key-exchange](https://eripe.oss-cn-shanghai.aliyuncs.com/img/top-questions-for-network.server-key-exchange.png)
 
 **E. client key Excnahge**
 
 该阶段客户端将自己的Yc发送给服务端，如下图所示：
 
-![client key](images/client-key-exchange.png)
+![top-questions-for-network.client-key-exchange](https://eripe.oss-cn-shanghai.aliyuncs.com/img/top-questions-for-network.client-key-exchange.png)
 
 **F. Change Chiper Spec**
 
@@ -334,7 +336,7 @@ tls的握手流程如下所示：
 
 该阶段的工作就是服务器传递给客户端一个Session用以维持https连接，不然每次都像上面这么连接是十分浪费资源的，此次传递的session如下图所示：
 
-![session ticket](images/session-ticket.png)
+![top-questions-for-network.session-ticket](https://eripe.oss-cn-shanghai.aliyuncs.com/img/top-questions-for-network.session-ticket.png)
 
 至此，同步了session后，客户端和服务端的握手流程结束，可以使用协商好的master key进行加密与解密了。
 
@@ -402,7 +404,7 @@ tls的握手流程如下所示：
 
 但是上面曾说道，我们可以发布自定义自签根证书，我们使用[dns劫持+伪造证书](https://blog.cuiyongjian.com/safe/https-attack/)开展中间人攻击，https将不再安全。攻击方法如下图所示：
 
-![https-hijack](images/https-hijack.drawio.svg)
+![https-hijack](https://eripe.oss-cn-shanghai.aliyuncs.com/img/https-hijack.drawio.svg)
 
 攻击前提是攻击者已经预先在主机中安装了自签名的根证书A，然后基本的攻击场景如下：
 
@@ -474,11 +476,11 @@ tcp的断开有两种情况：理想情况下的三次握手，或者**半关闭
 
 因为tcp是双工的，所以当tcp断开来接时，收发两端都需要确定对方收到了自己准备要断开连接的信息。所以与tcp建立连接的三次握手类似，在理想情况下，三次握手就能够保证收发两端收到足够的信息断开连接。过程如下图所示：
 
-![tcp-remove-three](images/tcp-remove-three-handshake.png)
+![top-questions-for-network.tcp-remove-three-handshake](https://eripe.oss-cn-shanghai.aliyuncs.com/img/top-questions-for-network.tcp-remove-three-handshake.png)
 
 而所谓的半关闭，是指在一方断开了连接的请款下，另一方仍能够发送剩余的信息。半关闭就需要四次握手才能传递足够的信息,这是因为理想情况下的第二次握手被拆分成了两次。如下图所示：
 
-![tcp-remove-four](images/tcp-remove-four-handshake.png)
+![top-questions-for-network.tcp-remove-four-handshake](https://eripe.oss-cn-shanghai.aliyuncs.com/img/top-questions-for-network.tcp-remove-four-handshake.png)
 
 ---
 
@@ -488,13 +490,13 @@ tcp的断开有两种情况：理想情况下的三次握手，或者**半关闭
 
 tcp连接与释放的过程中，会形成11种状态，如下图所示：
 
-![11-status](images/11-status.png)
+![top-questions-for-network.11-status](https://eripe.oss-cn-shanghai.aliyuncs.com/img/top-questions-for-network.11-status.png)
 
 而`TIME_WAIT`状态是**断开**连接时**主动方独有**的状态。当主动方进入该状态时，等待2MSL后，才会完全释放当前资源。
 
 我们以半关闭四次握手的状态转化为例，了解什么时候会进入该状态：
 
-![time-wait-status-in-four](images/time-wait-status-in-four.png)
+![top-questions-for-network.time-wait-status-in-four](https://eripe.oss-cn-shanghai.aliyuncs.com/img/top-questions-for-network.time-wait-status-in-four.png)
 
 从上图中看出，当主动方发出FIN后，会经历FIN-WAIT-1 --> FIN-WAIT-2 --> TIME-WAIT  --> CLOSED的状态转化。
 
@@ -541,7 +543,7 @@ tcp连接与释放的过程中，会形成11种状态，如下图所示：
 
 1. nagle算法定义是任意时刻，最多只能有一个未被确认的小段。 所谓“小段”，指的是小于MSS尺寸的数据块，所谓“未被确认”，是指一个数据块发送出去后，没有收到对方发送的ACK确认该数据已收到。流程如下图所示：
 
-![nagle](images/nagle.png)
+![top-questions-for-network.nagle](https://eripe.oss-cn-shanghai.aliyuncs.com/img/top-questions-for-network.nagle.png)
 
 **收方糊涂**是指收方处理数据很慢，每次都只能处理一个字节，而发送方一次也只能发送一个字节。处理的方法一般有以下两种：
 
@@ -555,8 +557,8 @@ tcp连接与释放的过程中，会形成11种状态，如下图所示：
 
 tcp提出了四种拥塞策略：慢启动，拥塞避免，快速重传，快恢复。而实际的拥塞算法可以按照判断拥塞的标准分为基于丢包的拥塞算法和基于网络延迟的拥塞算法[<sup>[18]</sup>](#refer-anchor-14)：
 
-![packet-loss](images/base-packet-loss.png)
-![time-loss](images/base-time.png)
+![top-questions-for-network.base-packet-loss](https://eripe.oss-cn-shanghai.aliyuncs.com/img/top-questions-for-network.base-packet-loss.png)
+![top-questions-for-network.base-time](https://eripe.oss-cn-shanghai.aliyuncs.com/img/top-questions-for-network.base-time.png)
 
 而上述四种拥塞策略主要应用在传统的基于丢包的拥塞算法上：
 
@@ -617,7 +619,7 @@ TCP的拥塞控制主要原理依赖于一个拥塞窗口(cwnd)来控制，在�
 
 具体来说快速恢复的流程如下所示：
 
-![reno-tcp](images/reno.png)
+![top-questions-for-network.reno](https://eripe.oss-cn-shanghai.aliyuncs.com/img/top-questions-for-network.reno.png)
 
 1. 当收到3个重复ACK时，把ssthresh设置为cwnd的一半，把cwnd设置为ssthresh的值加3，然后重传丢失的报文段，加3的原因是因为收到3个重复的ACK，表明有3个“老”的数据包离开了网络。 
 
