@@ -20,11 +20,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
 
-    - name: save current date
+    - name: save signal
       run: |
         date > ${{ env.NOTIFY_FILE }}
 
-    - name: Pushes date file
+    - name: Pushes signal
       uses: dmnemec/copy_file_to_another_repo_action@main
       env:
         API_TOKEN_GITHUB: ${{ secrets.BLOG_TOKEN }}
