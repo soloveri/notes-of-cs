@@ -2,13 +2,15 @@
 title: Dockerfile的基本规则
 mathjax: true
 data: 2020-07-22 09:48:28
-updated:
-tags:
+updated: 2021-06-03 17:02:39
+tags: Docker
+index_img: /img/docker.png
 categories:
-- Docker
+- tools
 ---
 
 ## 前言
+
 在了解了[docker的基本原理](Docker-filesys-layout.md)后，是时候了解以下Dockerfile是怎么写的了。首先我们需要了解`RUN`与`CMD`命令的区别。
 
 - `RUN`命令：每执行一次，就会在原有镜像的基础上添加一个`upper dir`保存所作的改变，所以对于一类的命令我们尽量使用一条`RUN`，否则会创建过多的不必要的`upper dir`
