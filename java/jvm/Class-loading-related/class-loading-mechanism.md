@@ -2,14 +2,12 @@
 title: 类的加载机制
 mathjax: true
 data: 2020-11-05 21:16:52
-updated:
-tags: 类加载
+updated: 2021-01-16 13:59:42
+tags: class loading
 categories: jvm
 ---
 
 # 1. 类初始化的时机
-
-update:2021-01-16 13:59:42
 
 当复习类加载时机时，我给自己抛出了一个问题：这里的时机只说明了**类**的初始化，那么对于接口呢？接口什么时候会被初始化呢？
 
