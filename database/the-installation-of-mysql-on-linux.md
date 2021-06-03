@@ -1,11 +1,12 @@
 ---
 title: 基于centos7安装MySQL
 mathjax: true
+hide: true
 data: 2020-11-11 23:20:49
 updated:
-tags:
+tags: MySQL
 categories:
-- Docker
+- tools
 ---
 
 ## 前言

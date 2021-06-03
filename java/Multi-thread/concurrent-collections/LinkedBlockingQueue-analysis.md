@@ -1,12 +1,13 @@
 ---
 title: LinkedBlockingQueue与ArrayBlockingQueue分析
 mathjax: true
+hide: true
 data: 2021-04-10 18:25:26
 updated:
 tags:
 - concurrent collections
 categories:
-- java基础
+- java basic
 ---
 
 `LinkedBlockingQueue`使用两个锁的原因是为了实现读写分离，聊率更高。如果只有一个锁，生产者和消费者只能有一个角色在工作。

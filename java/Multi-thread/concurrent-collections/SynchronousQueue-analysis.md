@@ -1,10 +1,10 @@
 ---
-title: SynchronousQueue分析
-mathjax: true
-data: 2021-04-10 16:47:08
-updated:
+title: SynchronousQueue源码分析
+index_img: /img/example.jpg
+date: 2021-06-03 16:48:20
+hide: true
 tags:
 - concurrent collections
 categories:
-- java基础
+- java basic
 ---
