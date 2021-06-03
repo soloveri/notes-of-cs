@@ -2,11 +2,11 @@
 title: Docker使用方法(一)-基本安装
 mathjax: true
 data: 2020-07-22 09:39:40
-updated:
+updated: 2021-06-03 16:50:37
 index_img: /img/docker.png
-tags:
+tags: Docker
 categories:
-- Docker
+- tools
 ---
 
 docker的基本使用与配置

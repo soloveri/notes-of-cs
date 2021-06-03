@@ -3,9 +3,10 @@ title: Docker使用方法(二)-文件系统架构
 mathjax: true
 data: 2020-07-22 09:48:28
 updated: 2021-06-03 16:09:25
-tags: tools
+tags: Docker
+index_img: /img/docker.png
 categories:
-- Docker
+- tools
 ---
 
 ## 前言
