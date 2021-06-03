@@ -6,7 +6,7 @@ updated: 2021-04-06 10:01:52
 tags:
 - concurrent collections
 categories:
-- java基础
+- java basic
 ---
 
 ## 前言
@@ -52,12 +52,11 @@ categories:
 ## 1. 整体架构
 
 对于`ConcurrentHashMap`，我们可以通过它实现的接口与继承的父类做一个初步的了解，如下所示：
-
-![concurrent-hashmap](images/ConcurrentHashMap-arch.png)
+![20210601112343](https://eripe.oss-cn-shanghai.aliyuncs.com/img/20210601112343.png)
 
 可以看到，`ConcurrentHashMap`与`HashMap`类似，通过继承抽象实现类`AbstractMap`完成了一个map应该有的大部分通用方法。当然，`ConcurrentHashMap`也实现了自定义的接口`ConcurrentMap`来完成一些特有的操作，如下所示：
 
-![ConcurrentMap-interface](images/ConcurrentMap-interface.png)
+![ConcurrentHashMap-analysis-I.ConcurrentMap-interface](https://eripe.oss-cn-shanghai.aliyuncs.com/img/ConcurrentHashMap-analysis-I.ConcurrentMap-interface.png)
 
 可以看到，虽然是特有接口，但是很多方法跟`HashMap`的方法重名了。那么它到底是如何保证线程安全的？与`HashMap`到底有什么异同？回答这个问题前，我们应该需要了解一下它的插入与删除操作。
 
@@ -146,7 +145,7 @@ final V putVal(K key, V value, boolean onlyIfAbsent) {
             synchronized (f) {
                 if (tabAt(tab, i) == f) {
                     //判断当前桶的存储模式是链表还是红黑树
-                    //因为红黑树的代理节点TreeBin的哈希值固定为-1
+                    //因为红黑树的代理节点TreeBin的哈希值固定为-2
                     //所以如果桶中的第一个节点哈希值>=0，说明当前存储模式为链表
                     if (fh >= 0) {
                         binCount = 1;
