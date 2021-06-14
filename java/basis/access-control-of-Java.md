@@ -1,7 +1,7 @@
 ---
 title: 思考java中的访问控制
 mathjax: true
-data: 2020-04-10 01:08:14
+date: 2020-04-10 01:08:14
 updated:
 tags:
 - 访问控制

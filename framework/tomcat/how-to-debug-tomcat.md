@@ -1,7 +1,7 @@
 ---
 title: 配置tomcat调试环境
 mathjax: true
-data: 2021-04-26 10:50:30
+date: 2021-04-26 10:50:30
 updated: 
 tags:
 - tomcat

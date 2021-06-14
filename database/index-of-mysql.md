@@ -1,7 +1,7 @@
 ---
 title: mysql中的索引
 mathjax: true
-data: 2020-10-10 21:01:02
+date: 2020-10-10 21:01:02
 updated:
 tags: 索引
 categories: mysql

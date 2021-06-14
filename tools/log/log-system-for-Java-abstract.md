@@ -1,9 +1,8 @@
 ---
 title: Java日志库扫盲
 mathjax: true
-hide: true
 intro: # abstract for file
-data: 2021-06-07 16:57:55
+date: 2021-06-07 16:57:55
 updated:
 tags: 
 - logging

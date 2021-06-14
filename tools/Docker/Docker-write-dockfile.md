@@ -1,7 +1,7 @@
 ---
 title: Dockerfile的基本规则
 mathjax: true
-data: 2020-07-22 09:48:28
+date: 2020-07-22 09:48:28
 updated: 2021-06-03 17:02:39
 tags: Docker
 index_img: /img/docker.png

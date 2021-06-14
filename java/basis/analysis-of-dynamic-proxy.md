@@ -1,7 +1,7 @@
 ---
 title: 动态代理的原理
 mathjax: true
-data: 2021-03-13 19:45:18
+date: 2021-03-13 19:45:18
 updated:
 tags:
 - dynamic proxy

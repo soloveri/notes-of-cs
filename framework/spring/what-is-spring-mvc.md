@@ -1,7 +1,7 @@
 ---
 title: Spring MVC原理 
 mathjax: true
-data: 2021-03-04 18:40:10
+date: 2021-03-04 18:40:10
 updated: 
 tags:
 - Spring MVC

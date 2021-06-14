@@ -1,7 +1,7 @@
 ---
 title: Java中的GC
 mathjax: true
-data: 2021-03-21 16:21:08
+date: 2021-03-21 16:21:08
 updated:
 tags:
 - garbage collection
