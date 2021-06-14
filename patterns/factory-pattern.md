@@ -235,6 +235,12 @@ And finally, the third point to note is that the Creator (parent) class invokes 
 
 ## 参考文章
 
-1. [Design Patterns: Abstract Factory vs Factory Method](https://stackoverflow.com/a/38668246/12893742)
+1. [Factory Comparison](https://refactoring.guru/design-patterns/factory-comparison)
 
-2. [Factory Pattern. When to use factory methods?](https://stackoverflow.com/a/30465141/12893742)
+2. [<工厂方法>比<简单工厂>多了啥（区别）](https://www.cnblogs.com/zhan520g/p/10461094.html)
+
+3. [Design Patterns: Abstract Factory vs Factory Method](https://stackoverflow.com/a/38668246/12893742)
+
+4. [What are the differences between Abstract Factory and Factory design patterns?](https://stackoverflow.com/questions/5739611/what-are-the-differences-between-abstract-factory-and-factory-design-patterns/50786084#50786084)
+
+5. [Factory Pattern. When to use factory methods?](https://stackoverflow.com/a/30465141/12893742)
