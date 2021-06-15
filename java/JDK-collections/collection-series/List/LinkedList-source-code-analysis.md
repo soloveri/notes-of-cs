@@ -1,7 +1,7 @@
 ---
 title: LinkedList源码分析
 mathjax: true
-data: 2020-07-27 20:22:38
+date: 2020-07-27 20:22:38
 updated:
 tags:
 - LinkedList

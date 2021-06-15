@@ -1,7 +1,7 @@
 ---
 title: ArrayList源码分析
 mathjax: true
-data: 2020-07-20 20:55:07
+date: 2020-07-20 20:55:07
 updated:
 tags:
 - ArrayList

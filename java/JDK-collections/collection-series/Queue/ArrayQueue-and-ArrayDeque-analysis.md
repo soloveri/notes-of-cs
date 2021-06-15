@@ -1,7 +1,7 @@
 ---
 title: ArrayQueue与ArrayDeque源码分析
 mathjax: true
-data: 2020-07-20 21:36:34
+date: 2020-07-20 21:36:34
 updated: 2020-07-22 23:17:56
 tags:
 - ArrayQueue

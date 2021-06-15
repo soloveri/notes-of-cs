@@ -1,7 +1,7 @@
 ---
 title: 红黑树入门
 mathjax: true
-data: 2020-07-11 09:32:21
+date: 2020-07-11 09:32:21
 updated: 
 tags:
 - 红黑树,map
