@@ -247,7 +247,7 @@ CASE(_monitorenter): {
           CALL_VM(InterpreterRuntime::monitorenter(THREAD, entry), handle_exception);
         }
         success = true;
-      }
+  
 
       /*****************************************************/
       // ④ 未偏向任何线程或者偏向的不是当前线程，尝试重新偏向
@@ -289,7 +289,7 @@ CASE(_monitorenter): {
       
       // 将锁记录空间(Lock Record)指向Displaced Mark Word
       entry->lock()->set_displaced_header(displaced);
-      // 是否禁用偏向锁和轻量级锁
+      //如果指定了-XX:+UseHeavyMonitors，则call_vm=true，代表禁用偏向锁和轻量级锁
       bool call_vm = UseHeavyMonitors;
       if (call_vm || Atomic::cmpxchg_ptr(entry, lockee->mark_addr(), displaced) != displaced) {
         // 判断是不是锁重入，是的话把Displaced Mark Word设置为null来表示重入
