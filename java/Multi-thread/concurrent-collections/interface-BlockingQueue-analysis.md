@@ -1,7 +1,7 @@
 ---
 title: BlockingQueue接口分析
 mathjax: true
-data: 2021-04-10 15:54:12
+date: 2021-04-10 15:54:12
 updated:
 tags:
 - concurrent collections

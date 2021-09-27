@@ -1,7 +1,7 @@
 ---
 title: AQS使用的CLH原型
 mathjax: true
-data: 2020-12-10 13:53:22
+date: 2020-12-10 13:53:22
 updated: 2020-12-14 15:02:30
 tags: 
 - synchronized

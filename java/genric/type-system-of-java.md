@@ -1,12 +1,12 @@
 ---
-title: java中的类型系统
+title: Java中的类型系统
 mathjax: true
-data: 2020-08-07 21:36:24
+date: 2020-08-07 21:36:24
 updated:
+excerpt: 本文简要介绍了Java中反射使用的类型系统，包括一些基本概念
 tags:
-- 基本概念
 - 类型
-categories: 反射
+categories: Java
 ---
 
 ## 前言
@@ -53,11 +53,7 @@ interface Move { void move(int deltax, int deltay); }
 
 在jse8规范中,`type variable`被定义为一个唯一的符号在类、接口、方法、构造函数中作为一个type。所以这个`type variable`只能在上面四个地方使用。引入`type variable`的原因是因为在泛型类、泛型接口、泛型构造函数、泛型方法中定义了类型参数。
 
-所以,很好理解,`type variable`就是泛型中`<T>`中的T。注意,`type`
-
-
-
-`Type`接口是java中type信息的顶级接口。主要有五种type,分别是:
+所以,很好理解,`type variable`就是泛型中`<T>`中的T。注意，`Type`接口是java中type信息的顶级接口。主要有五种type,分别是:
 
 - `raw types`:原始类型,使用对应类型的Class对象表示
 - `primitive types`:基本类型,使用对应原始类型的Class对象表示
@@ -66,15 +62,14 @@ interface Move { void move(int deltax, int deltay); }
 - `type variables`:类型变量,基于接口`TypeVariable`,对应实现类为`TypeVariableImpl`
 - `WildcardType`:通配符类型,基于接口`WildcardType`,对应实现类为`WildcardTypeImpl`
 
-其中`ParameterizedTypes`、`GenericArrayType`、`TypeVariable`、`WildcardType`这四个接口是`Type`接口的子接口。继承图如下所示:
-
-![Type继承图](images/Type.png)
+其中`ParameterizedTypes`、`GenericArrayType`、`TypeVariable`、`WildcardType`这四个接口是`Type`接口的子接口。继承图如下所示:![Type继承图](https://eripe.oss-cn-shanghai.aliyuncs.com/img/type-system-of-java.Type.png)
 
 可以看到,`Class`类是`Type`接口的子类。下面来一一解释一下四种子接口的含义。
 
 ## 1. ParameterizedType
 
 `ParameterizedType`翻译过来就是参数化类型,emm。应该就是将类型参数化,这是引入泛型(Generic)的必然结果。例如我们常用的`List<Integer>`,这一个完整的带`<>`的类型就叫做参数化类型。下面解释了raw type于parameterized type之间的关系。
+
 - genric type:`List<T>`
 - parameterized type:`List<Integer>`
 - raw type:`List`
@@ -87,6 +82,7 @@ interface Move { void move(int deltax, int deltay); }
 - `Type getOwnerType()`: 返回当前成员的属主,例如`Map.Entry`属于`Map`
 
 以具体的参数化类型, 如`Map<String, String>`为例:
+
 ``` java
 public class TestType {
     Map<String, String> map;
@@ -104,11 +100,13 @@ public class TestType {
 }
 
 ```
+
 ## 2. TypeVariable
 
 类型变量, 范型信息在编译时会被转换为一个特定的类型, 而TypeVariable就是用来反映在JVM编译该泛型前的信息.
 
 **常用方法:**
+
 - `Type[] getBounds()`: 获取类型变量的上边界, 若未明确声明上边界则默认为Object
 - `D getGenericDeclaration()`: 获取声明该类型变量实体,其中`D`是泛型类型的声明,也就是所在的类全限定名
 - `String getName()`: 获取在源码中定义时的名字
@@ -152,6 +150,7 @@ public class TestType <K extends Comparable & Serializable, V> {
 我们仍然记得,不能创建泛型数组,那么这个`GenericArrayType`是啥意思?
 
 虽然不能泛型数组,但是能够创建泛型数组引用啊,`T[] nums=null`是合法的,见下方代码:
+
 ``` java
 public class TestType <T> {
     public static void main(String[] args) throws Exception {
@@ -188,7 +187,8 @@ class Test<T> {
 - Type[] getLowerBounds(): 获取范型变量的下界
 注意:
 
-现阶段通配符只接受一个上边界或下边界, 返回数组是为了以后的扩展, 实际上现在返回的数组的大小是1
+现阶段通配符只接受一个上边界或下边界, 返回数组是为了以后的扩展, 实际上现在返回的数组的大小是1。
+
 ``` java
 public class TestType {
     private List<? extends Number> a;  // // a没有下界, 取下界会抛出ArrayIndexOutOfBoundsException

@@ -1,12 +1,12 @@
 ---
 title: ConcurrentHashMap架构解析
 mathjax: true
-data: 2021-03-29 09:56:54
+date: 2021-03-29 09:56:54
 updated: 2021-04-06 10:01:52
 tags:
-- concurrent collections
+- ConcurrentHashMap
 categories:
-- java basic
+- Java
 ---
 
 ## 前言

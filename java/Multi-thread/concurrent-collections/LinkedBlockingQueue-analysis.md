@@ -2,7 +2,7 @@
 title: LinkedBlockingQueue与ArrayBlockingQueue分析
 mathjax: true
 hide: true
-data: 2021-04-10 18:25:26
+date: 2021-04-10 18:25:26
 updated:
 tags:
 - concurrent collections

@@ -1,7 +1,7 @@
 ---
 title: ThreadLocal源码解析
 mathjax: true
-data: 2021-01-12 10:49:01
+date: 2021-01-12 10:49:01
 updated: 2021-01-13 23:00:48
 tags: 
 - ThreadLocal

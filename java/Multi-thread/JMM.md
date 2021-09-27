@@ -1,7 +1,7 @@
 ---
 title: Java内存模型
 mathjax: true
-data: 2020-12-06 13:13:19
+date: 2020-12-06 13:13:19
 updated:
 tags: 
 - JMM

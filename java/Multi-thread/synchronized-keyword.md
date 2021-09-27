@@ -1,7 +1,7 @@
 ---
 title: synchronized关键字
 mathjax: true
-data: 2020-12-01 19:54:01
+date: 2020-12-01 19:54:01
 updated: 2020-12-10 10:59:23
 tags: 
 - synchronized
@@ -233,7 +233,7 @@ CASE(_monitorenter): {
         /*****************************************************/
         // ③ 锁对象头的 epoch 与 class 的 epoch 不相等，尝试重偏向
       else if ((anticipated_bias_locking_value & epoch_mask_in_place) !=0) {
-        // try rebias
+        // 构造一个偏向当前线程的mark word
         markOop new_header = (markOop) ( (intptr_t) lockee->klass()->prototype_header() | thread_ident);
         if (hash != markOopDesc::no_hash) {
           new_header = new_header->copy_set_hash(hash);
@@ -251,6 +251,7 @@ CASE(_monitorenter): {
 
       /*****************************************************/
       // ④ 未偏向任何线程或者偏向的不是当前线程，尝试重新偏向
+      //下面构建一个匿名偏向的mark word，尝试用CAS指令替换掉锁对象的mark word
       else {
         markOop header = (markOop) ((uintptr_t) mark & ((uintptr_t)markOopDesc::biased_lock_mask_in_place |
                                                         (uintptr_t)markOopDesc::age_mask_in_place |

@@ -1,16 +1,16 @@
 ---
 title: 反射初体验
 mathjax: true
-data: 2020-06-18 21:14:51
+date: 2020-06-18 21:14:51
 updated:
-tags: 基本概念
-categories: 反射
+excerpt: 本文为初学者描述了在Java中反射的基本使用方法
+tags: 反射
+categories: Java
 ---
 
-### 0x0 反射是什么
+## 0. 反射是什么
 
 反射是java中非常重要的一个概念。简而言之，反射就是在程序**运行时**可以**动态**的获取一个类的对象、执行某个类的方法等等。这里采用[overflow](https://stackoverflow.com/questions/4453349/what-is-the-class-object-java-lang-class)上的一个回答。
-
 
 >In order to fully understand the class object, let go back in and understand we get the class object in the first place. You see, every .java file you create, when you compile that .java file, the jvm will creates a .class file, this file contains all the information about the class, namely:
 
@@ -32,7 +32,7 @@ With a class object, you are obtain information such as class name, and method n
 
 注意，对于一个类，jvm只会生成一个对应的Class对象。
 
-### 0x1 反射有什么用
+## 1. 反射有什么用
 
 反射最主要的作用的我认为就是提高了对未知应用的扩展能力。
 
@@ -48,9 +48,9 @@ With a class object, you are obtain information such as class name, and method n
 
 当然，这些服务应该还有统一的接口，不然不可能实现一份代码适配多种情况。
 
-### 0x2 反射怎么用
+## 2. 反射怎么用
 
-#### 1. 获取反射对象
+### 2.1 获取反射对象
 
 想使用反射，我们必须得首先获得Class对象，获得Class对象的方法有三种：
 
@@ -75,7 +75,7 @@ With a class object, you are obtain information such as class name, and method n
     }
 ```
 
-#### 2. 通过Class对象创造实例
+### 2.2 通过Class对象创造实例
 
 主要有两种方法：
 
@@ -108,13 +108,13 @@ With a class object, you are obtain information such as class name, and method n
 
 第二种可以获取任意一个构造函数，无论有参无参、私有公共，不过就是参数必须一一对应。
 
-#### 3. 获取修饰符
+### 2.3 获取修饰符
 
 修饰符的信息封装在`Modifier`类中，常见的用法通过`getModifiers()`返回一个用于描述Field、Method和Constructor的修饰符的整形数值，然后再由Modifier的静态方法`toString()`转为字符串。
 
 以及一些常用的判断是否为`static`字段。
 
-#### 4. 获取类的属性
+### 2.4 获取类的属性
 
 类的属性都由Filed类管理。常用的方法有：
 
@@ -148,7 +148,7 @@ private static String parseFields(Class c){
     }
 ```
 
-#### 5. 获取类的构造方法
+### 2.5 获取类的构造方法
 
 同样，类的构造方法也会被封装在`Constructor`类中。`getDeclaredConstructors()`可以获取该类的所有构造方法。但是不包含**父类的构造方法**。
 
@@ -180,7 +180,7 @@ private static String parseConstructor(Class c){
     }
 ```
 
-#### 6. 获取类的所有方法
+### 2.6 获取类的所有方法
 
 与上面类似，方法被封装在Method类中，同样，`getDeclaredMethod()`获取的方法**不包括**父类的方法。`getMethods()`获取公共的、父类或接口的所有方法。
 
@@ -217,7 +217,7 @@ private static String parseMethods(Class c){
 
 通过获取Method对象时，仍然需要通过准确的参数类型才能找到我们想要的method对象。
 
-#### 7. 解析类的基本信息
+### 2.7 解析类的基本信息
 
 有了上面的工具我们就可以通过class文件来解析该类的基本信息了，我们构造两个类，Person和Employee类，后者继承前者：
 
@@ -317,7 +317,7 @@ public ReflectionBase.Employee extends ReflectionBase.Person{
 
 ```
 
-#### 8. 解析类的数据
+### 2.8 解析类的数据
 
 上面的解析是解析类的基本结构，那么如何获取一个对象的具体数据呢？与上面类似，我们将对象的类型分为三种，字符串、数组、普通对象。采用递归的方法解析所有字段。
 
@@ -423,7 +423,7 @@ java.util.ArrayList[elementData=class java.lang.Object[]{
 
 小结：我们通过Filed类的`getType()`的方法来获取属性的类型，通过Field类的`get(Object o)`获取该属性的值，参数为我们当前想要查看的对象。
 
-### 0x4 反射机制的优缺点
+### 3. 反射机制的优缺点
 
 优点：
 

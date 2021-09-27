@@ -1,10 +1,12 @@
 ---
-title: mysql中的索引
+title: MySQL中的索引
 mathjax: true
 date: 2020-10-10 21:01:02
 updated:
-tags: 索引
-categories: mysql
+intro: 
+tags: 
+- 索引
+categories: MySQL
 ---
 
 ## 前言

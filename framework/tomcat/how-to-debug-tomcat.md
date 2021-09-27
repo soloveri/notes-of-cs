@@ -139,7 +139,7 @@ categories: framework
 
 所以最后的虚拟机配置如下所示：
 
-![vm-options](images/tomcat-vm-options.png)
+![vm-options](https://eripe.oss-cn-shanghai.aliyuncs.com/img/how-to-debug-tomcat.tomcat-vm-options.png)
 处理JSP解析问题：
 
 在`org.apache.catalina.startup.ContextConfig.configStart`手动初始化jsp，添加如下代码：
@@ -148,7 +148,8 @@ categories: framework
 
 添加位置如下所示：
 
-![position](images/tomcat-jsp-position.png)
+![position](https://eripe.oss-cn-shanghai.aliyuncs.com/img/how-to-debug-tomcat.tomcat-jsp-position.png)
+
 ## 参考文献
 
 1. [基于IntelliJ IDEA环境】Tomcat8源码的调试和项目部署](https://gongxufan.github.io/2017/10/20/tomcat-source-debug/)

@@ -1,8 +1,7 @@
 ---
 title: 五种IO模型
 mathjax: true
-data: 2020-10-28 22:17:45
-updated:
+date: 2020-10-28 22:17:45
 tags: IO模型
 categories: IO
 ---
@@ -247,7 +246,6 @@ epoll有EPOLLLT和EPOLLET两种触发模式。它们主要的区别有两点：
 **那么在任何时候都应该优选选择`epoll`吗？**
 
 答案当然是否定的。如果当前服务器的连接数较少并且都很活跃，`epoll`不一定会优于`select`，因为`epoll`注册回调函数等操作都需要代价。
-
 
 ## 4. java世界中的多路复用模型
 

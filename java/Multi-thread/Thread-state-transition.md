@@ -1,7 +1,7 @@
 ---
 title: 线程的状态转换
 mathjax: true
-data: 2020-06-21 23:00:13
+date: 2020-06-21 23:00:13
 updated:
 tags: 状态转换
 categories: 多线程

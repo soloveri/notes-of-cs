@@ -2,7 +2,7 @@
 title: MySQL的锁
 mathjax: true
 hide: true
-data: 2021-08-06 22:09:09
+date: 2021-08-06 22:09:09
 updated: 
 tags:
 - lock

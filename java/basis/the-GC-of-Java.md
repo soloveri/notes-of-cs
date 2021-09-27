@@ -4,9 +4,9 @@ mathjax: true
 date: 2021-03-21 16:21:08
 updated:
 tags:
-- garbage collection
+- 垃圾回收
 categories:
-- java
+- Java
 ---
 
 Java中的自动垃圾回收是其一大优点。本文将从以下三个方面简介相关知识：
@@ -120,7 +120,7 @@ Java的垃圾回收策略主要有三种：
 - ParNew收集器 (复制算法)，**并行**
 - Parallel Scavenge收集器，**并行**，追求高吞吐量
 
-作用于老年代的包括：
+作用于老年代的包括： 
 
 - CMS，**并行**，使用标记清除策略，追求最短GC回收停顿时间。
 - Parallel Old收集器，**并行**，使用标记-整理策略，追求高吞吐量

@@ -1,15 +1,15 @@
 ---
-title: java的泛型
+title: Java的泛型
 mathjax: true
-data: 2020-08-09 19:14:38
+date: 2020-08-09 19:14:38
 updated:
 tags:
-- 基本概念
 - 泛型
-categories: 反射
+categories: Java
 ---
 
 ## 前言
+
 > 这篇文章是在研究java的Type体系顺带扯出的概念,泛型的使用要说简单也很简单,要说难也可以说难。本文将由浅入深,带你学习java中的"泛型"。
 
 ## 1. 泛型的基本概念
@@ -40,6 +40,7 @@ categories: 反射
 **泛型类与泛型接口:**
 
 泛型类和泛型接口的声明比较简单,仅需要在类名或者接口名后面使用`<>`声明`type variable`即可。
+
 ``` java
 //泛型类
 class Person<T,E> {
@@ -126,6 +127,7 @@ public class GenericTest {
     }
 }
 ```
+
 运行结果如下:
 
 ``` java
@@ -157,6 +159,7 @@ E elementData(int index) {
 ``` java
 public static <M> calc(M year,M mouth){...}
 ```
+
 `calc`中不能使用泛型类`People`中的类型变量`T`。
 
 **泛型构造方法:**
@@ -295,13 +298,14 @@ ArrayList<String> ref=(ArrayList<String>[])new ArrayList[];//cast
 >上述所有言论基于java1.8,似乎在java10中已经开始支持泛型数组,但并未考证
 ---
 
-回到正题,java中的泛型是不变的。如果泛型是协变的,思考如下代码:
+回到正题,java中的泛型是不支持协变的。如果泛型是协变的,思考如下代码:
 
 ``` java
 ArrayList<Number> ref=new ArrayList<Integer>();
 
 ref.add(2.3f);//cast
 ```
+
 在我们眼里,`ref`是一个存储`Number`的容器,那么就可以往里面存储`Double`、`Float`、`Integer`。取元素的时候到底转换成什么类型?程序不知道,程序员也不知道。并且很可能会产生运行时错误。既然这么,干脆就在编译期将这类错误禁止就完事了,但是仍然可以通过一些操作实现协变的逻辑。
 
 对于泛型不支持逆变,是因为父类的引用赋值给子类就非常危险,所以当然不支持,而且也不可能实现。
@@ -397,6 +401,7 @@ tom eat shit.
 lili eat air.
 candy eat air.
 ```
+
 成功实现了我们的需求。
 
 ### 存下取上原则
@@ -412,8 +417,7 @@ candy eat air.
 
 下面的图片很好的解释了这个原则:
 
-![upper-bound](images/upper-bound.drawio.svg)
-
+![upper-bound](https://eripe.oss-cn-shanghai.aliyuncs.com/img/the-generic-of-java.upper-bound.drawio.svg)
 所以如果容器中,存在有**上界通配符**的泛型:对其写入的元素是很鸡肋的,相当于这个容器是**只读**的。
 
 **B. 下界通配符:**
@@ -441,7 +445,7 @@ public static void insert(List<? super Dog> set){
 }
 ```
 
-![lower-bound](images/lower-bound.drawio.svg)
+![lower-bound](https://eripe.oss-cn-shanghai.aliyuncs.com/img/the-generic-of-java.lower-bound.drawio.svg)
 
 当然类似的,这里只能读取`Object`类型的对象,也很鸡肋。
 
@@ -730,9 +734,9 @@ class Student extends Person{
 
 子类与父类都进行了擦除这么说并不准确,因为根本就没有定义子类的类型参数...规则和父类擦除而子类不擦除的规则一样。要看父类的类型参数有没有上限,因为编译器的推断类型是不一样的。
 
-**那么为什么不能父类不擦除,而子类不擦除呢？**
+**那么为什么不能父类不擦除,而子类擦除的情况呢？**
 
-因为继承泛型类时,子类必须对父类中的类型参数进行初始化,当然父类擦除或者由子类指定都可以。所以子类擦除而父类不擦除,父类中的类型参数由谁来初始化?
+因为继承泛型类时,子类必须对父类中的类型参数进行初始化,当父类擦除或者由子类指定时子类都可以确定父类的泛型实际类型。但是如果子类擦除而父类没有擦除，那么父类中的类型参数无法从子类中获得，到底怎么初始化?
 
 #### 3.3 泛型下的类型获取
 
@@ -763,7 +767,6 @@ public void main(){
 2. [Java中的泛型会被类型擦除，那为什么在运行期仍然可以使用反射获取到具体的泛型类型？](https://www.zhihu.com/question/346911525)
 
 ## 参考文献
-
 
 1. [仔细说说Java中的泛型](https://zhuanlan.zhihu.com/p/31137677)
 

@@ -1,7 +1,7 @@
 ---
 title: 类的加载机制
 mathjax: true
-data: 2020-11-05 21:16:52
+date: 2020-11-05 21:16:52
 updated: 2021-01-16 13:59:42
 tags: class loading
 categories: jvm

@@ -1,7 +1,7 @@
 ---
 title: java的内存布局
 mathjax: true
-data: 2020-07-21 23:32:14
+date: 2020-07-21 23:32:14
 updated:
 tags: 内存布局
 categories: jvm

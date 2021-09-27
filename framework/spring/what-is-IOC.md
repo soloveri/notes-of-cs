@@ -3,6 +3,7 @@ title: IOC到底是什么？
 mathjax: true
 date: 2021-03-12 18:48:08
 updated:
+index_img: 
 tags: Spring
 categories: framework
 ---
@@ -13,9 +14,9 @@ categories: framework
 
 ## 1. IOC是什么？
 
-IOC，Inversion of Control，译为控制反转。
+IOC，Inversion of Control，译为控制反转。并不是一种设计模式，但是可以算作一种方法论。
 
-1996年，Michael Mattson在其论文:[Object-Oriented FrameworksA survey of methodological issues](https://www.researchgate.net/publication/2238535_Object-Oriented_Frameworks)中，首先提出了IOC这个概念，IOC是一个方法论。
+~~1996年，Michael Mattson在其论文:[Object-Oriented FrameworksA survey of methodological issues](https://www.researchgate.net/publication/2238535_Object-Oriented_Frameworks)中，首先提出了IOC这个概念~~。根据[Martin Fowler](https://martinfowler.com/bliki/InversionOfControl.html)的追溯，Johnson and Foote于1988年在论文[Designing Reusable Classes](http://www.laputan.org/drc/drc.html)首次提出了术语“Inversion of Control”。
 
 简单来说，IOC的概念仅适用于面向对象的框架，而不面向于库函数。如果使用了框架，那么不再是程序员控制程序的所有流程，而是框架控制我们书写的程序，我们写的程序仅仅是为了适应框架。
 
@@ -93,7 +94,6 @@ public class Main{
 
 1. 因为采用了依赖注入，在初始化的过程中就不可避免的会写大量的new。这里IoC容器就解决了这个问题。这个容器可以自动对你的代码进行初始化，你只需要维护一个Configuration（可以是xml可以是一段代码）
 2. 我们在创建实例的时候不需要了解其中依赖资源的细节
-
 
 ## 参考文章
 

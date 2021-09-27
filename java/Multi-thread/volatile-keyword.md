@@ -1,12 +1,13 @@
 ---
 title: volatile关键字
 mathjax: true
-data: 2020-12-06 13:13:19
+date: 2020-12-06 13:13:19
 updated:
+excerpt: 本文介绍了在Java中volatile关键字的基本概念与相应原理
 tags: 
 - volatile
 categories:
-- 多线程基础
+- Java
 ---
 
 ## 1. volatile是什么

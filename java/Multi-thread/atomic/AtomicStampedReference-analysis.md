@@ -1,7 +1,7 @@
 ---
 title: AtomicStampedReference源码解析
 mathjax: true
-data: 2021-04-13 11:42:05
+date: 2021-04-13 11:42:05
 updated:
 tags:
 - atomic

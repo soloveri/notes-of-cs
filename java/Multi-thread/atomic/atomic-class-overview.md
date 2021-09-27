@@ -1,7 +1,7 @@
 ---
 title: 原子类总览
 mathjax: true
-data: 2021-04-11 20:37:00
+date: 2021-04-11 20:37:00
 updated:
 tags:
 - atomic class

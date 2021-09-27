@@ -1,12 +1,13 @@
 ---
 title: 通过MySQL驱动的加载学习SPI机制
 mathjax: true
-data: 2020-11-11 22:19:25
+date: 2020-11-11 22:19:25
 updated:
+excerpt: 本文通过数据库驱动的加载原理简要分析了Java的SPI机制
 tags: 
 - SPI机制
 - 数据库驱动加载
-categories: 类加载
+categories: Java
 ---
 
 ## 前言 什么是SPI

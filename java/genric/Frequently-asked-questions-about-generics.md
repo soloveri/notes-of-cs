@@ -1,11 +1,11 @@
 ---
 title: 关于泛型的常见问题
 mathjax: true
-data: 2020-08-14 20:59:33
+date: 2020-08-14 20:59:33
 updated:
 tags:
 - 泛型
-categories: 基础
+categories: Java
 ---
 
 ## 前言
@@ -73,10 +73,10 @@ class C<X>{//X:<Number
 ``` java
 List<? extends Number> foo(List<? extends Number> numberList)
 {
-#1  for(Number number : numberList)
-#2      assert numberList.contains(number);
-#3  numberList = numberList;
-#4  return numberList;
+  #1  for(Number number : numberList)
+  #2      assert numberList.contains(number);
+  #3  numberList = numberList;
+  #4  return numberList;
 }
 ```
 
@@ -260,7 +260,6 @@ MyList<?> myList;//
 - 枚举类型:因为枚举类型不能有类型参数,所以枚举类中的值都是静态类型的,但是又因为**类型参数不能用于任何静态的上下文环境**,所以在枚举类中使用泛型是没有任何意义的
 - 匿名内部类:它可以继承一个参数化类型的类或者接口,但它本身不能是，因为**匿名内部泛型类没有任何意义**。因为匿名内部类没有名字,所以在声明时就没有地方提供类型参数
 - 异常类:一个泛型类不能间接或者直接继承自`Throwable`接口,因为异常处理机制是一种运行时机制,但是在运行时泛型已经被擦出了。所以对于同一个泛型类型但是类型参数不同的两个参数化类型来说,虚拟机并不能区分它们,所以异常泛型类也是无意义的。
-
 
 ## 6.能不能强转成参数化类型?
 

@@ -13,7 +13,7 @@ categories: framework
 MVC是一种设计规范，并不是一种设计模式。该规范将一个web分割成3部分来处理：请求首先经过控制器Controller；经过业务处理得到数据模型Model；最后通过model渲染视图View并响应给客户端。
 
 我们完全利用Servlet自己实现MVC规范，如下图所示：
-![servlet-mvc](images/servlet-mvc.png)
+![servlet-mvc](https://eripe.oss-cn-shanghai.aliyuncs.com/img/what-is-spring-mvc.servlet-mvc.png)
 
 基本流程为：
 

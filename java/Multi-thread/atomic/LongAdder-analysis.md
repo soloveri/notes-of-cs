@@ -1,7 +1,7 @@
 ---
 title: LongAdder源码解析
 mathjax: true
-data: 2021-04-14 09:53:33
+date: 2021-04-14 09:53:33
 updated:
 tags:
 - atomic

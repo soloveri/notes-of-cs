@@ -2,7 +2,7 @@
 title: MVCC基础
 mathjax: true
 hide: true
-data: 2021-08-06 22:09:09
+date: 2021-08-06 22:09:09
 updated: 
 tags:
 - MySQL
@@ -66,7 +66,8 @@ MVCC就是借助快照读的产生的ReadView、每行记录的三个隐式字�
 
 我们以一个例子来解释MVCC的工作原理，假设当前待操作的行记录如下所示：
 
-![mvcc-record](./images/mvcc-undo-log-part-i.drawio.svg)
+![mvcc-record](https://eripe.oss-cn-shanghai.aliyuncs.com/img/mvcc..imagesmvcc-undo-log-part-i.drawio.svg.svg)
+
 
 数据库开启了事务A、B、C，D，事务C将上述记录的`age`字段修改为18，事务D将上述记录的`name`字段修改为tom，执行动作的时刻如下所示：
 
@@ -82,7 +83,7 @@ MVCC就是借助快照读的产生的ReadView、每行记录的三个隐式字�
 | t8 |  |  | | |
 
 假设给事务A、C、D分配的事务ID分别为1、2、3，那么在t4时刻，undo log的形式应如下所示：
-![mvcc-readview-ii](./images/mvcc-undo-log-part-ii.drawio.svg)
+![mvcc-readview-ii](https://eripe.oss-cn-shanghai.aliyuncs.com/img/mvcc.mvcc-undo-log-part-ii.drawio.svg)
 
 t5时刻事务A执行select前，会生成ReadView，生成的四个参数如下所示：
 | 参数 | m_ids | min_trx_id |  max_trx_id&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | creator_trx_id |
@@ -94,7 +95,7 @@ t5时刻事务A执行select前，会生成ReadView，生成的四个参数如下
 1. 对该行加排他锁
 2. 将该行的原始数据创建快照，存入undo log
 3. 执行修改操作后，并将修改后的`DB_ROLL_PTR`指向undo log最新的一行，如下所示：
-![mvcc-readview-iii](./images/mvcc-undo-log-part-iii.drawio.svg)
+![mvcc-readview-iii](https://eripe.oss-cn-shanghai.aliyuncs.com/img/mvcc.mvcc-undo-log-part-iii.drawio.svg)
 
 在修改完成后，轮到事务A执行读取操作，那么事务A会根据undo log以及可见性算法来抉择到底读取哪一版本的数据：
 

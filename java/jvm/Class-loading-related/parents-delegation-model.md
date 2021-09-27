@@ -1,7 +1,7 @@
 ---
 title: 双亲委派模型
 mathjax: true
-data: 2020-11-05 21:11:27
+date: 2020-11-05 21:11:27
 updated:
 tags: 类加载
 categories: jvm

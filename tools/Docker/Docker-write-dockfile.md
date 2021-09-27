@@ -3,20 +3,21 @@ title: Dockerfile的基本规则
 mathjax: true
 date: 2020-07-22 09:48:28
 updated: 2021-06-03 17:02:39
+index_img: https://eripe.oss-cn-shanghai.aliyuncs.com/img/basic-Docker-install.docker.png
+excerpt: 简要介绍了Dockerfile的基本书写规则
 tags: Docker
-index_img: /img/docker.png
 categories:
 - tools
 ---
 
-## 前言
+## 0. 前言
 
 在了解了[docker的基本原理](Docker-filesys-layout.md)后，是时候了解以下Dockerfile是怎么写的了。首先我们需要了解`RUN`与`CMD`命令的区别。
 
 - `RUN`命令：每执行一次，就会在原有镜像的基础上添加一个`upper dir`保存所作的改变，所以对于一类的命令我们尽量使用一条`RUN`，否则会创建过多的不必要的`upper dir`
 - `CMD`命令：容器是一个进程，`CMD`命令就像是容器启动时输入的命令参数，所以只能有一条`CMD`
 
-## Dockerfile的栗子
+## 1. Dockerfile的栗子
 
 下面是我基于centos7.8制作的mysql5.7镜像。Dockerfile如下所示：
 
@@ -85,6 +86,7 @@ docker run -d -u 1000:1000 \
 --publish 3306:3306  -v /usr/local/mysql/config/my.cnf:/etc/my.cnf -v /usr/local/mysql/log/mysqld.log:/var/log/mysqld.log mysql:latest /usr/sbin/init
 
 ```
+
 上面我进行了三项文件或目录的映射：
 
 1. (宿主机)/usr/local/mysql/data/----->(容器)/var/lib/mysql
@@ -106,7 +108,6 @@ docker run -d -u 1000:1000 \
 4. 如果指定了容器中存在且和宿主机uid相同的用户，那么就能正常操作文件
 
 所以显而易见，docker是**根据uid而不是username的映射**来完成权限管理的。所以我们在创建镜像时，一般都会创建一个uid与宿主机数据卷所有者相同的用户方便在容器中操作文件。**一定要确保容器执行者的权限和挂载数据卷的所有者相对应。**
-
 
 ## 参考文献
 

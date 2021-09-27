@@ -1,7 +1,7 @@
 ---
 title: AtomicInteger源码解析
 mathjax: true
-data: 2021-04-12 11:46:51
+date: 2021-04-12 11:46:51
 updated:
 tags:
 - atomic
