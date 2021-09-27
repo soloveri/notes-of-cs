@@ -4,13 +4,11 @@ mathjax: true
 date: 2020-07-22 09:39:40
 updated: 2021-06-03 16:50:37
 index_img: /img/docker.png
+excerpt: 简要介绍了docker的基本使用与配置
 tags: Docker
 categories:
 - tools
 ---
-
-docker的基本使用与配置
-<!--more-->
 
 ## 前言
 
